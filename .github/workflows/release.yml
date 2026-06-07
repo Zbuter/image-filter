@@ -74,22 +74,61 @@ jobs:
       - name: Upload updater artifacts to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          REPO="${{ github.repository }}"
-          
-          echo "=== Uploading updater artifacts ==="
-          
-          # Find and upload all updater-related files (.tar.gz, .zip, .sig)
-          # but skip .dmg, .msi, .exe, .app which are already uploaded by tauri-action
-          find src-tauri/target -path "*/bundle/*" -type f \( -name "*.tar.gz" -o -name "*.tar.gz.sig" -o -name "*.nsis.zip" -o -name "*.nsis.zip.sig" -o -name "*.msi.zip" -o -name "*.msi.zip.sig" \) 2>/dev/null | while read filepath; do
-            filename=$(basename "$filepath")
-            echo "Uploading updater artifact: $filename"
-            gh release upload "$TAG" "$filepath" --repo "$REPO" --clobber || echo "Warning: failed to upload $filename"
-          done
-          
-          echo "=== Done uploading updater artifacts ==="
+          node -e "
+            const { execSync } = require('child_process');
+            const fs = require('fs');
+            const path = require('path');
+            
+            const tag = process.env.GITHUB_REF.replace('refs/tags/', '');
+            const repo = '${{ github.repository }}';
+            
+            // Recursively find files matching patterns in bundle directory
+            function findFiles(dir, patterns) {
+              let results = [];
+              try {
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+                for (const entry of entries) {
+                  const fullPath = path.join(dir, entry.name);
+                  if (entry.isDirectory()) {
+                    results = results.concat(findFiles(fullPath, patterns));
+                  } else if (patterns.some(p => entry.name.endsWith(p))) {
+                    results.push(fullPath);
+                  }
+                }
+              } catch(e) {}
+              return results;
+            }
+            
+            const bundleDir = path.join('src-tauri', 'target', 'release', 'bundle');
+            const universalBundleDir = path.join('src-tauri', 'target', 'universal-apple-darwin', 'release', 'bundle');
+            
+            // Updater artifact extensions to upload
+            const updaterPatterns = ['.tar.gz', '.tar.gz.sig', '.nsis.zip', '.nsis.zip.sig', '.msi.zip', '.msi.zip.sig'];
+            
+            let files = [];
+            for (const dir of [bundleDir, universalBundleDir]) {
+              if (fs.existsSync(dir)) {
+                files = files.concat(findFiles(dir, updaterPatterns));
+              }
+            }
+            
+            console.log('Found updater artifacts:', files);
+            
+            for (const filepath of files) {
+              const filename = path.basename(filepath);
+              // Normalize path for gh CLI (use forward slashes)
+              const normalizedPath = filepath.split(path.sep).join('/');
+              try {
+                console.log('Uploading:', filename);
+                execSync('gh release upload \"' + tag + '\" \"' + normalizedPath + '\" --repo \"' + repo + '\" --clobber', { stdio: 'inherit' });
+              } catch(e) {
+                console.error('Warning: failed to upload', filename, e.message);
+              }
+            }
+            
+            console.log('Done uploading updater artifacts');
+          "
 
   merge-updater-json:
     needs: publish-tauri
@@ -122,7 +161,6 @@ jobs:
             sleep 10
           done
           
-          # Download all release assets
           mkdir -p assets
           gh release download "$TAG" --repo "$REPO" --dir assets --clobber || true
           
@@ -187,7 +225,7 @@ jobs:
               console.log('Added windows-x86_64:', winNsis);
             }
             
-            // Windows MSI: look for .msi.zip (fallback)
+            // Windows MSI fallback
             if (!platforms['windows-x86_64']) {
               const winMsi = files.find(f => f.includes('.msi.zip') && !f.endsWith('.sig'));
               const winMsiSig = files.find(f => f.includes('.msi.zip.sig'));
@@ -225,7 +263,6 @@ jobs:
           TAG="${{ steps.get_tag.outputs.tag }}"
           REPO="${{ github.repository }}"
           
-          # Delete existing latest.json if present
           EXISTING=$(gh api repos/$REPO/releases/tags/$TAG | jq -r '.assets[] | select(.name == "latest.json") | .id')
           if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
             echo "Deleting existing latest.json..."
