@@ -66,6 +66,7 @@ jobs:
           tagName: v__VERSION__
           releaseName: "Image Filter v__VERSION__"
           releaseBody: ${{ steps.changelog.outputs.changelog }}
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+          includeUpdaterJson: true
