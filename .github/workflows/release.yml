@@ -70,3 +70,119 @@ jobs:
           prerelease: false
           updaterJsonPreRelease: false
           args: ${{ matrix.args }}
+
+  merge-updater-json:
+    needs: publish-tauri
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          REPO="${{ github.repository }}"
+          
+          # Get release info
+          RELEASE_INFO=$(gh api repos/$REPO/releases/tags/$TAG)
+          ASSETS=$(echo "$RELEASE_INFO" | jq -r '.assets[] | "\(.name)|\(.url)"')
+          
+          mkdir -p assets
+          while IFS='|' read -r name url; do
+            if [[ "$name" == *.json ]]; then
+              echo "Downloading $name..."
+              curl -L -H "Authorization: token $GITHUB_TOKEN" \
+                -H "Accept: application/octet-stream" \
+                -o "assets/$name" "$url"
+            fi
+          done <<< "$ASSETS"
+          
+          ls -la assets/
+
+      - name: Merge updater JSON files into latest.json
+        run: |
+          cd assets
+          
+          # Find all platform-specific updater JSON files
+          JSON_FILES=$(ls -1 *.json 2>/dev/null | grep -v latest.json || true)
+          
+          if [ -z "$JSON_FILES" ]; then
+            echo "No updater JSON files found, creating minimal latest.json"
+            # Create a minimal latest.json from release info
+            cat > latest.json << 'MINIMAL_EOF'
+          {
+            "version": "0.0.0",
+            "notes": "Update available",
+            "pub_date": "",
+            "platforms": {}
+          }
+          MINIMAL_EOF
+          else
+            echo "Found updater JSON files: $JSON_FILES"
+            
+            # Use node to merge the JSON files
+            node -e "
+              const fs = require('fs');
+              const files = '$JSON_FILES'.split('\n').filter(f => f.trim());
+              
+              let merged = {
+                version: '',
+                notes: '',
+                pub_date: '',
+                platforms: {}
+              };
+              
+              for (const file of files) {
+                try {
+                  const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+                  console.log('Processing:', file, JSON.stringify(data, null, 2));
+                  
+                  // Copy version, notes, pub_date from first valid file
+                  if (!merged.version && data.version) merged.version = data.version;
+                  if (!merged.notes && data.notes) merged.notes = data.notes;
+                  if (!merged.pub_date && data.pub_date) merged.pub_date = data.pub_date;
+                  
+                  // Merge platforms
+                  if (data.platforms) {
+                    Object.assign(merged.platforms, data.platforms);
+                  }
+                  
+                  // Handle direct platform keys (some formats put platforms at root)
+                  for (const key of ['darwin', 'windows', 'linux', 'darwin-aarch64', 'darwin-x86_64', 'windows-x86_64']) {
+                    if (data[key]) {
+                      merged.platforms[key] = data[key];
+                    }
+                  }
+                } catch (e) {
+                  console.error('Error processing', file, e.message);
+                }
+              }
+              
+              fs.writeFileSync('latest.json', JSON.stringify(merged, null, 2));
+              console.log('Merged latest.json:', JSON.stringify(merged, null, 2));
+            "
+          fi
+          
+          cat latest.json
+
+      - name: Upload latest.json to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          REPO="${{ github.repository }}"
+          
+          # Check if latest.json already exists in release
+          EXISTING=$(gh api repos/$REPO/releases/tags/$TAG | jq -r '.assets[] | select(.name == "latest.json") | .id')
+          
+          if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
+            echo "Deleting existing latest.json asset..."
+            gh api -X DELETE repos/$REPO/releases/assets/$EXISTING
+          fi
+          
+          echo "Uploading latest.json..."
+          gh release upload "$TAG" assets/latest.json --repo "$REPO" --clobber
+          
+          echo "Done! Verifying..."
+          gh release view "$TAG" --repo "$REPO" --json assets | jq -r '.assets[].name'
