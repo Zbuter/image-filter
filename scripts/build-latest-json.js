@@ -32,36 +32,28 @@ if (macTar) {
   console.log('Added darwin-universal:', macTar);
 }
 
-// Windows NSIS: .nsis.zip
-const winNsis = files.find(f => f.includes('.nsis.zip') && !f.endsWith('.sig'));
-const winNsisSig = files.find(f => f.includes('.nsis.zip.sig'));
-if (winNsis) {
+// Windows: look for any .zip that's an updater artifact (not .sig)
+// Patterns: .nsis.zip, -setup.exe.zip, .msi.zip
+const winZip = files.find(f => 
+  (f.includes('.nsis.zip') || f.includes('-setup.exe.zip') || f.includes('.msi.zip')) 
+  && !f.endsWith('.sig')
+);
+const winZipSig = files.find(f => 
+  (f.includes('.nsis.zip.sig') || f.includes('-setup.exe.zip.sig') || f.includes('.msi.zip.sig'))
+);
+
+if (winZip) {
   let sig = '';
-  if (winNsisSig) {
-    sig = fs.readFileSync(path.join(assetsDir, winNsisSig), 'utf8').trim();
+  if (winZipSig && fs.existsSync(path.join(assetsDir, winZipSig))) {
+    sig = fs.readFileSync(path.join(assetsDir, winZipSig), 'utf8').trim();
   }
   platforms['windows-x86_64'] = {
     signature: sig,
-    url: baseUrl + '/' + encodeURIComponent(winNsis)
+    url: baseUrl + '/' + encodeURIComponent(winZip)
   };
-  console.log('Added windows-x86_64:', winNsis);
-}
-
-// Windows MSI fallback: .msi.zip
-if (!platforms['windows-x86_64']) {
-  const winMsi = files.find(f => f.includes('.msi.zip') && !f.endsWith('.sig'));
-  const winMsiSig = files.find(f => f.includes('.msi.zip.sig'));
-  if (winMsi) {
-    let sig = '';
-    if (winMsiSig) {
-      sig = fs.readFileSync(path.join(assetsDir, winMsiSig), 'utf8').trim();
-    }
-    platforms['windows-x86_64'] = {
-      signature: sig,
-      url: baseUrl + '/' + encodeURIComponent(winMsi)
-    };
-    console.log('Added windows-x86_64 (msi):', winMsi);
-  }
+  console.log('Added windows-x86_64:', winZip, '(sig:', winZipSig ? 'yes' : 'no', ')');
+} else {
+  console.log('No Windows updater zip found in:', files);
 }
 
 const latest = { version, notes, pub_date: pubDate, platforms };
