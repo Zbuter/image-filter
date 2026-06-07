@@ -74,61 +74,11 @@ jobs:
       - name: Upload updater artifacts to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_REPO: ${{ github.repository }}
+        shell: bash
         run: |
-          node -e "
-            const { execSync } = require('child_process');
-            const fs = require('fs');
-            const path = require('path');
-            
-            const tag = process.env.GITHUB_REF.replace('refs/tags/', '');
-            const repo = '${{ github.repository }}';
-            
-            // Recursively find files matching patterns in bundle directory
-            function findFiles(dir, patterns) {
-              let results = [];
-              try {
-                const entries = fs.readdirSync(dir, { withFileTypes: true });
-                for (const entry of entries) {
-                  const fullPath = path.join(dir, entry.name);
-                  if (entry.isDirectory()) {
-                    results = results.concat(findFiles(fullPath, patterns));
-                  } else if (patterns.some(p => entry.name.endsWith(p))) {
-                    results.push(fullPath);
-                  }
-                }
-              } catch(e) {}
-              return results;
-            }
-            
-            const bundleDir = path.join('src-tauri', 'target', 'release', 'bundle');
-            const universalBundleDir = path.join('src-tauri', 'target', 'universal-apple-darwin', 'release', 'bundle');
-            
-            // Updater artifact extensions to upload
-            const updaterPatterns = ['.tar.gz', '.tar.gz.sig', '.nsis.zip', '.nsis.zip.sig', '.msi.zip', '.msi.zip.sig'];
-            
-            let files = [];
-            for (const dir of [bundleDir, universalBundleDir]) {
-              if (fs.existsSync(dir)) {
-                files = files.concat(findFiles(dir, updaterPatterns));
-              }
-            }
-            
-            console.log('Found updater artifacts:', files);
-            
-            for (const filepath of files) {
-              const filename = path.basename(filepath);
-              // Normalize path for gh CLI (use forward slashes)
-              const normalizedPath = filepath.split(path.sep).join('/');
-              try {
-                console.log('Uploading:', filename);
-                execSync('gh release upload \"' + tag + '\" \"' + normalizedPath + '\" --repo \"' + repo + '\" --clobber', { stdio: 'inherit' });
-              } catch(e) {
-                console.error('Warning: failed to upload', filename, e.message);
-              }
-            }
-            
-            console.log('Done uploading updater artifacts');
-          "
+          node scripts/upload-updater-artifacts.js
 
   merge-updater-json:
     needs: publish-tauri
@@ -184,74 +134,45 @@ jobs:
           
           node -e "
             const fs = require('fs');
-            
-            const version = '$VERSION';
-            const pubDate = '$PUB_DATE';
-            const notes = process.argv[1];
-            const baseUrl = '$BASE_URL';
+            const version = process.env.VERSION;
+            const pubDate = process.env.PUB_DATE;
+            const notes = process.env.NOTES;
+            const baseUrl = process.env.BASE_URL;
             
             let platforms = {};
             const files = fs.readdirSync('.');
-            
             console.log('Available files:', files);
             
-            // macOS: look for .app.tar.gz
             const macTar = files.find(f => f.endsWith('.app.tar.gz'));
             const macSig = files.find(f => f.endsWith('.app.tar.gz.sig'));
             if (macTar) {
-              let sig = '';
-              if (macSig && fs.existsSync(macSig)) {
-                sig = fs.readFileSync(macSig, 'utf8').trim();
-              }
-              platforms['darwin-universal'] = {
-                signature: sig,
-                url: baseUrl + '/' + encodeURIComponent(macTar)
-              };
+              let sig = macSig ? fs.readFileSync(macSig, 'utf8').trim() : '';
+              platforms['darwin-universal'] = { signature: sig, url: baseUrl + '/' + encodeURIComponent(macTar) };
               console.log('Added darwin-universal:', macTar);
             }
             
-            // Windows NSIS: look for .nsis.zip
             const winNsis = files.find(f => f.includes('.nsis.zip') && !f.endsWith('.sig'));
             const winNsisSig = files.find(f => f.includes('.nsis.zip.sig'));
             if (winNsis) {
-              let sig = '';
-              if (winNsisSig && fs.existsSync(winNsisSig)) {
-                sig = fs.readFileSync(winNsisSig, 'utf8').trim();
-              }
-              platforms['windows-x86_64'] = {
-                signature: sig,
-                url: baseUrl + '/' + encodeURIComponent(winNsis)
-              };
+              let sig = winNsisSig ? fs.readFileSync(winNsisSig, 'utf8').trim() : '';
+              platforms['windows-x86_64'] = { signature: sig, url: baseUrl + '/' + encodeURIComponent(winNsis) };
               console.log('Added windows-x86_64:', winNsis);
             }
             
-            // Windows MSI fallback
             if (!platforms['windows-x86_64']) {
               const winMsi = files.find(f => f.includes('.msi.zip') && !f.endsWith('.sig'));
               const winMsiSig = files.find(f => f.includes('.msi.zip.sig'));
               if (winMsi) {
-                let sig = '';
-                if (winMsiSig && fs.existsSync(winMsiSig)) {
-                  sig = fs.readFileSync(winMsiSig, 'utf8').trim();
-                }
-                platforms['windows-x86_64'] = {
-                  signature: sig,
-                  url: baseUrl + '/' + encodeURIComponent(winMsi)
-                };
+                let sig = winMsiSig ? fs.readFileSync(winMsiSig, 'utf8').trim() : '';
+                platforms['windows-x86_64'] = { signature: sig, url: baseUrl + '/' + encodeURIComponent(winMsi) };
                 console.log('Added windows-x86_64 (msi):', winMsi);
               }
             }
             
-            const latest = {
-              version: version,
-              notes: notes,
-              pub_date: pubDate,
-              platforms: platforms
-            };
-            
+            const latest = { version, notes, pub_date: pubDate, platforms };
             fs.writeFileSync('latest.json', JSON.stringify(latest, null, 2));
             console.log('Generated latest.json:', JSON.stringify(latest, null, 2));
-          " "$NOTES"
+          "
           
           echo "=== Final latest.json ==="
           cat latest.json
