@@ -30,3 +30,4 @@ updater.key
 # Updater keys (keep secret!)
 updater.key
 updater.key.pub
+package-lock.json
