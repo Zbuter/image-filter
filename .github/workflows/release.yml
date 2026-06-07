@@ -29,7 +29,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
-          cache: 'npm'
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -42,7 +41,7 @@ jobs:
           brew install libpng
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install
 
       - name: Extract changelog for version
         id: changelog
