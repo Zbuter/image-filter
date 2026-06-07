@@ -19,3 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - 修复 Naive UI 组件在深色主题下的显示问题
+
+## [0.1.1] - 2026-06-07
+
+### Fixed
+- 修复自动更新端点 URL，使用正确的 GitHub 仓库地址
+
