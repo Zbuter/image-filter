@@ -45,6 +45,7 @@ jobs:
 
       - name: Extract changelog for version
         id: changelog
+        shell: bash
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           CHANGELOG=$(awk "/^## \[${VERSION}\]/{flag=1;next}/^## \[/{flag=0}flag" CHANGELOG.md)
