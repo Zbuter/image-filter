@@ -47,10 +47,6 @@
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
       "timestampUrl": ""
-    },
-    "updater": {
-      "active": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM5OTY3OEU0QkZENDkyN0EKUldSNmt0Uy81SGlXeVFxa0k3RE5FaVdXRkQzeUVvR08xQmlNeHl6VTFVVXdURzVIWDMvQS9IM08K"
     }
   },
   "plugins": {
