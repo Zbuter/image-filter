@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-06-09
+
 ### Added
 - GitHub 自动更新功能
 - 检查更新按钮
@@ -18,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 统一导出对话框和目录树字体颜色为白色
 
 ### Fixed
+- 使用 Tauri v2 updater 原生发布链路生成和上传 `latest.json`
+- 修复检查更新失败时错误信息显示不完整的问题
 - 修复 Naive UI 组件在深色主题下的显示问题
 
 ## [0.1.1] - 2026-06-07

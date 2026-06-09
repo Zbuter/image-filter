@@ -119,6 +119,16 @@ interface UpdateInfo {
   body?: string
 }
 
+function formatError(error: unknown) {
+  if (error instanceof Error) {
+    return error.message
+  }
+  if (typeof error === 'string') {
+    return error
+  }
+  return String(error)
+}
+
 async function checkUpdate() {
   try {
     checkingUpdate.value = true
@@ -139,8 +149,8 @@ async function checkUpdate() {
     } else {
       alert('当前已是最新版本')
     }
-  } catch (e: any) {
-    alert('检查更新失败: ' + e.message)
+  } catch (e: unknown) {
+    alert('检查更新失败: ' + formatError(e))
   } finally {
     checkingUpdate.value = false
   }
@@ -150,8 +160,8 @@ async function installUpdateFunc() {
   try {
     const result = await invoke<string>('install_update')
     alert(result)
-  } catch (e: any) {
-    alert('安装更新失败: ' + e.message)
+  } catch (e: unknown) {
+    alert('安装更新失败: ' + formatError(e))
   }
 }
 

@@ -57,7 +57,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0.5.21
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -68,74 +68,7 @@ jobs:
           releaseBody: ${{ steps.changelog.outputs.changelog }}
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true
+          uploadUpdaterJson: true
+          uploadUpdaterSignatures: true
+          updaterJsonPreferNsis: true
           args: ${{ matrix.args }}
-
-      - name: Upload updater artifacts to release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ github.ref_name }}
-          RELEASE_REPO: ${{ github.repository }}
-        shell: bash
-        run: node scripts/upload-updater-artifacts.js
-
-  merge-updater-json:
-    needs: publish-tauri
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get tag name
-        id: get_tag
-        run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-
-      - name: Wait for release and collect assets
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${{ steps.get_tag.outputs.tag }}"
-          REPO="${{ github.repository }}"
-          for i in $(seq 1 30); do
-            if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-              echo "Release available!"
-              break
-            fi
-            sleep 10
-          done
-          mkdir -p assets
-          gh release download "$TAG" --repo "$REPO" --dir assets --clobber || true
-          ls -la assets/
-
-      - name: Build latest.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BUILD_VERSION: ${{ steps.get_tag.outputs.tag }}
-          BUILD_ASSETS_DIR: assets
-        run: |
-          TAG="${{ steps.get_tag.outputs.tag }}"
-          REPO="${{ github.repository }}"
-          export BUILD_VERSION="${TAG#v}"
-          export BUILD_BASE_URL="https://github.com/$REPO/releases/download/$TAG"
-          RELEASE_INFO=$(gh api repos/$REPO/releases/tags/$TAG)
-          export BUILD_PUB_DATE=$(echo "$RELEASE_INFO" | jq -r '.published_at')
-          export BUILD_NOTES=$(echo "$RELEASE_INFO" | jq -r '.body // "Update available"')
-          node scripts/build-latest-json.js
-          cat assets/latest.json
-
-      - name: Upload latest.json to release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${{ steps.get_tag.outputs.tag }}"
-          REPO="${{ github.repository }}"
-          EXISTING=$(gh api repos/$REPO/releases/tags/$TAG | jq -r '.assets[] | select(.name == "latest.json") | .id')
-          if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
-            gh api -X DELETE repos/$REPO/releases/assets/$EXISTING
-          fi
-          gh release upload "$TAG" assets/latest.json --repo "$REPO" --clobber
-          echo "=== Verification ==="
-          gh release view "$TAG" --repo "$REPO" --json assets | jq -r '.assets[].name'
