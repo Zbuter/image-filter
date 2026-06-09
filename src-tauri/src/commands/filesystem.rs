@@ -34,7 +34,7 @@ pub fn list_drives() -> Result<Vec<DriveInfo>, String> {
             let drive_path = format!("{}:\\", letter as char);
             let path = PathBuf::from(&drive_path);
             if path.exists() {
-                if let Ok(metadata) = fs::metadata(&path) {
+                if let Ok(_metadata) = fs::metadata(&path) {
                     drives.push(DriveInfo {
                         name: format!("{}:", letter as char),
                         path: drive_path,

@@ -1,53 +1,97 @@
 <template>
   <div class="app-container">
-    <div class="toolbar">
-      <button @click="selectDirectory">选择目录</button>
-      <div class="toolbar-spacer"></div>
-      <input 
-        v-model="filterText" 
-        type="text" 
-        placeholder="搜索文件名..."
-        class="search-input"
-      />
-      <select v-model="fileTypeFilter" class="filter-select">
-        <option value="all">全部</option>
-        <option value="raw">RAW 格式</option>
-        <option value="regular">普通图片</option>
-        <option value="custom">自定义后缀</option>
-      </select>
-      <input 
-        v-if="fileTypeFilter === 'custom'"
-        v-model="customExtensions"
-        type="text"
-        placeholder="输入后缀，如: jpg,png"
-        class="custom-ext-input"
-      />
-      <div class="view-tabs">
-        <button 
-          :class="{ active: currentView === 'directory' }"
-          @click="currentView = 'directory'"
-        >
-          目录浏览
+    <!-- Toolbar -->
+    <header class="toolbar">
+      <div class="toolbar-left">
+        <button class="btn btn-primary" @click="selectDirectory">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <span>打开目录</span>
         </button>
+        <button class="btn btn-ghost" @click="addScanDirectory" title="添加额外扫描目录（双卡模式）">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <template v-if="store.directories.length > 1">
+          <div class="dir-tags">
+            <span 
+              v-for="dir in store.directories" 
+              :key="dir" 
+              class="dir-tag"
+            >
+              <span class="dir-tag-name">{{ getDirLabel(dir) }}</span>
+              <button class="dir-tag-remove" @click="store.removeDirectory(dir)" title="移除目录">×</button>
+            </span>
+          </div>
+        </template>
+        <div class="toolbar-divider"></div>
+        <div class="search-box">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input 
+            v-model="filterText" 
+            type="text" 
+            placeholder="搜索文件名..."
+            class="search-input"
+          />
+        </div>
+        <select v-model="fileTypeFilter" class="filter-select">
+          <option value="all">全部类型</option>
+          <option value="raw">RAW 格式</option>
+          <option value="regular">普通图片</option>
+          <option value="custom">自定义后缀</option>
+        </select>
+        <input 
+          v-if="fileTypeFilter === 'custom'"
+          v-model="customExtensions"
+          type="text"
+          placeholder="jpg,png"
+          class="ext-input"
+        />
+      </div>
+
+      <div class="toolbar-right">
+        <!-- Extensible slot for future AI features -->
+        <slot name="toolbar-actions"></slot>
+
+        <div class="view-switcher">
+          <button 
+            class="switcher-btn"
+            :class="{ active: currentView === 'directory' }"
+            @click="currentView = 'directory'"
+            title="目录浏览"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </button>
+          <button 
+            class="switcher-btn"
+            :class="{ active: currentView === 'selected' }"
+            @click="currentView = 'selected'"
+            title="已选图片"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            <span v-if="store.selectedCount > 0" class="badge">{{ store.selectedCount }}</span>
+          </button>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
         <button 
-          :class="{ active: currentView === 'selected' }"
-          @click="currentView = 'selected'"
+          class="btn btn-ghost" 
+          @click="checkUpdate" 
+          :disabled="checkingUpdate"
+          title="检查更新"
         >
-          已选图片 ({{ store.selectedCount }})
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
       </div>
-      <button @click="checkUpdate" :disabled="checkingUpdate" class="update-btn">
-        {{ checkingUpdate ? '检查中...' : '检查更新' }}
-      </button>
-    </div>
+    </header>
 
+    <!-- Main Content -->
     <div class="main-content">
-      <div class="sidebar">
+      <aside class="sidebar">
         <DirectoryTree />
-      </div>
+      </aside>
 
-      <div class="content">
-        <div v-if="currentView === 'directory'">
+      <main class="content">
+        <div v-if="currentView === 'directory'" class="content-inner">
           <Breadcrumb />
           <ImageGrid 
             :filter-text="filterText"
@@ -61,7 +105,7 @@
           :file-type-filter="fileTypeFilter"
           :custom-extensions="customExtensions"
         />
-      </div>
+      </main>
     </div>
 
     <ImagePreview 
@@ -112,6 +156,28 @@ async function selectDirectory() {
   } catch (e) {
     console.error('Failed to select directory:', e)
   }
+}
+
+async function addScanDirectory() {
+  try {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+    })
+    if (selected) {
+      await store.addDirectory(selected as string)
+    }
+  } catch (e) {
+    console.error('Failed to add directory:', e)
+  }
+}
+
+function getDirLabel(path: string): string {
+  // Show last two segments for readability, e.g. "D:\DCIM" or "E:\RAW\2024"
+  const normalized = path.replace(/\\/g, '/').replace(/\/$/, '')
+  const parts = normalized.split('/')
+  if (parts.length <= 2) return path
+  return parts.slice(-2).join('/')
 }
 
 interface UpdateInfo {
@@ -166,14 +232,28 @@ async function installUpdateFunc() {
 }
 
 function switchToSelected() {
+  store.setPreviewImage(null)
   currentView.value = 'selected'
 }
 
+function isInputFocused(): boolean {
+  const el = document.activeElement
+  if (!el) return false
+  const tag = el.tagName.toLowerCase()
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || (el as HTMLElement).isContentEditable
+}
+
 function handleKeydown(e: KeyboardEvent) {
+  // Let input elements handle their own shortcuts
+  if (isInputFocused()) return
+
   if (e.ctrlKey || e.metaKey) {
     if (e.key === 'a') {
       e.preventDefault()
       store.selectAll()
+    } else if (e.key === 'i') {
+      e.preventDefault()
+      store.invertSelection()
     } else if (e.key === 'f') {
       e.preventDefault()
       const input = document.querySelector('.search-input') as HTMLInputElement
@@ -196,107 +276,213 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #1e1e1e;
-  color: #fff;
+  background: var(--bg-base);
+  color: var(--text-primary);
 }
 
+/* ── Toolbar ─────────────────────────────────────── */
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: #2a2a2a;
-  border-bottom: 1px solid #3a3a3a;
+  justify-content: space-between;
+  height: var(--toolbar-height);
+  padding: 0 12px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  gap: 8px;
 }
 
-.toolbar button {
-  padding: 6px 12px;
-  background: #3a3a3a;
-  border: 1px solid #4a4a4a;
-  border-radius: 4px;
-  color: #fff;
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-subtle);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 12px;
   cursor: pointer;
-  font-size: 13px;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  line-height: 1;
 }
 
-.toolbar button:hover {
-  background: #4a4a4a;
+.btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
-.toolbar-spacer {
-  flex: 1;
+.btn-primary {
+  background: var(--accent-muted);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.btn-primary:hover {
+  background: rgba(212, 160, 83, 0.2);
+  border-color: var(--accent);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+  padding: 5px 6px;
+}
+
+.btn-ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Search */
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 8px;
+  color: var(--text-tertiary);
+  pointer-events: none;
 }
 
 .search-input {
-  padding: 6px 12px;
-  background: #3a3a3a;
-  border: 1px solid #4a4a4a;
-  border-radius: 4px;
-  color: #fff;
-  font-size: 13px;
-  width: 200px;
+  padding: 5px 8px 5px 28px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  width: 180px;
+  transition: border-color var(--transition-fast);
+}
+
+.search-input::placeholder {
+  color: var(--text-tertiary);
 }
 
 .search-input:focus {
-  outline: none;
-  border-color: #007acc;
+  border-color: var(--accent-border);
 }
 
+/* Filter Select */
 .filter-select {
-  padding: 6px 12px;
-  background: #3a3a3a;
-  border: 1px solid #4a4a4a;
-  border-radius: 4px;
-  color: #fff;
-  font-size: 13px;
+  padding: 5px 24px 5px 8px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
   cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b6a68'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: border-color var(--transition-fast);
 }
 
 .filter-select:focus {
-  outline: none;
-  border-color: #007acc;
+  border-color: var(--accent-border);
 }
 
-.custom-ext-input {
-  padding: 6px 12px;
-  background: #3a3a3a;
-  border: 1px solid #4a4a4a;
-  border-radius: 4px;
-  color: #fff;
-  font-size: 13px;
-  width: 150px;
+.ext-input {
+  padding: 5px 8px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  width: 100px;
+  transition: border-color var(--transition-fast);
 }
 
-.custom-ext-input:focus {
-  outline: none;
-  border-color: #007acc;
+.ext-input::placeholder {
+  color: var(--text-tertiary);
 }
 
-.view-tabs {
+.ext-input:focus {
+  border-color: var(--accent-border);
+}
+
+/* View Switcher */
+.view-switcher {
   display: flex;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.switcher-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
-}
-
-.view-tabs button {
-  padding: 6px 12px;
-  background: #3a3a3a;
-  border: 1px solid #4a4a4a;
-  border-radius: 4px;
-  color: #999;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
   cursor: pointer;
-  font-size: 13px;
+  transition: all var(--transition-fast);
+  font-size: 11px;
 }
 
-.view-tabs button.active {
-  background: #007acc;
-  border-color: #007acc;
-  color: #fff;
+.switcher-btn:first-child {
+  border-right: 1px solid var(--border-subtle);
 }
 
-.view-tabs button:hover:not(.active) {
-  background: #4a4a4a;
+.switcher-btn:hover {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
 }
 
+.switcher-btn.active {
+  color: var(--accent);
+  background: var(--accent-muted);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: var(--accent);
+  color: var(--bg-base);
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* ── Main Layout ─────────────────────────────────── */
 .main-content {
   display: flex;
   flex: 1;
@@ -304,75 +490,73 @@ onUnmounted(() => {
 }
 
 .sidebar {
-  width: 250px;
-  background: #252525;
-  border-right: 1px solid #3a3a3a;
+  width: var(--sidebar-width);
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
   overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .content {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-.status-bar {
-  background: #2a2a2a;
-  padding: 6px 16px;
-  border-top: 1px solid #3a3a3a;
+.content-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Directory Tags */
+.dir-tags {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.dir-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px 2px 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.dir-tag-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dir-tag-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-tertiary);
   font-size: 12px;
-  height: 28px;
-  flex-shrink: 0;
-}
-
-.status-left {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.status-indicator {
-  color: #4ec9b0;
-}
-
-.status-indicator.loading {
-  color: #dcdcaa;
-}
-
-.status-item {
-  color: #888;
-}
-
-.highlight {
-  color: #007acc;
-  font-weight: 500;
-}
-
-.status-right {
-  color: #666;
-}
-
-.shortcuts {
-  font-size: 11px;
-}
-.update-btn {
-  padding: 6px 12px;
-  background: #3a3a3a;
-  border: 1px solid #4a4a4a;
-  border-radius: 4px;
-  color: #fff;
+  line-height: 1;
   cursor: pointer;
-  font-size: 13px;
+  transition: all var(--transition-fast);
+  padding: 0;
 }
 
-.update-btn:hover:not(:disabled) {
-  background: #4a4a4a;
-}
-
-.update-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.dir-tag-remove:hover {
+  background: var(--danger);
+  color: #fff;
 }
 </style>

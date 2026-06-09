@@ -89,6 +89,7 @@ pub fn extract_embedded_jpeg(path: &Path) -> Result<Vec<u8>, String> {
     Ok(jpeg_data)
 }
 
+#[allow(dead_code)]
 pub fn decode_raw_to_rgb(path: &Path) -> Result<image::RgbImage, String> {
     let jpeg_data = extract_embedded_jpeg(path)?;
     let img = image::load_from_memory_with_format(&jpeg_data, ImageFormat::Jpeg)
@@ -96,6 +97,7 @@ pub fn decode_raw_to_rgb(path: &Path) -> Result<image::RgbImage, String> {
     Ok(img.to_rgb8())
 }
 
+#[allow(dead_code)]
 pub fn generate_raw_thumbnail(path: &Path, size: u32) -> Result<image::RgbImage, String> {
     let rgb = decode_raw_to_rgb(path)?;
     let (w, h) = (rgb.width(), rgb.height());
@@ -111,6 +113,7 @@ pub fn generate_raw_thumbnail(path: &Path, size: u32) -> Result<image::RgbImage,
     Ok(thumbnail)
 }
 
+#[allow(dead_code)]
 pub fn get_raw_dimensions(path: &Path) -> Result<(Option<u32>, Option<u32>), String> {
     match decode_raw_to_rgb(path) {
         Ok(img) => Ok((Some(img.width()), Some(img.height()))),

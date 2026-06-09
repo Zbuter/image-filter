@@ -1,23 +1,32 @@
 <template>
   <div class="image-grid">
-    <div v-if="store.loading" class="loading">加载中...</div>
-    <div v-else-if="filteredImages.length === 0" class="empty">暂无图片</div>
+    <div v-if="store.loading" class="loading-state">
+      <div class="spinner"></div>
+      <span>加载中...</span>
+    </div>
+    <div v-else-if="filteredImages.length === 0" class="empty-state">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <span>暂无图片</span>
+    </div>
     <div v-else class="grid">
       <div 
         v-for="image in filteredImages" 
         :key="image.path"
-        class="image-item"
+        class="image-card"
         :class="{ selected: store.isImageSelected(image.path) }"
         @click="handleClick(image, $event)"
         @dblclick="handleDoubleClick(image)"
       >
-        <img :src="getImageUrl(image.path)" :alt="image.name" loading="lazy" />
-        <div class="image-info">
-          <div class="image-name">{{ image.name }}</div>
-          <div class="image-size">{{ formatSize(image.size) }}</div>
+        <div class="card-image">
+          <img :src="getImageUrl(image.path)" :alt="image.name" loading="lazy" />
+          <span v-if="image.rawPath" class="raw-badge">RAW</span>
+          <button class="select-check" @click.stop="toggleSelection(image)">
+            <svg v-if="store.isImageSelected(image.path)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
         </div>
-        <div class="checkmark" @click.stop="toggleSelection(image)">
-          <span v-if="store.isImageSelected(image.path)">✓</span>
+        <div class="card-info">
+          <span class="card-name" :title="image.name">{{ image.name }}</span>
+          <span class="card-dir" v-if="showDirHint" :title="getDirName(image.path)">{{ getDirName(image.path) }}</span>
         </div>
       </div>
     </div>
@@ -43,7 +52,6 @@ const RAW_EXTENSIONS = ['cr2', 'cr3', 'nef', 'arw', 'dng', 'orf', 'rw2', 'pef', 
 const filteredImages = computed(() => {
   let images = store.images
 
-  // 类型筛选
   if (props.fileTypeFilter === 'raw') {
     images = images.filter(img => RAW_EXTENSIONS.includes(img.extension.toLowerCase()))
   } else if (props.fileTypeFilter === 'regular') {
@@ -55,7 +63,6 @@ const filteredImages = computed(() => {
     }
   }
 
-  // 名称搜索
   if (props.filterText) {
     const filter = props.filterText.toLowerCase()
     images = images.filter(img => img.name.toLowerCase().includes(filter))
@@ -136,6 +143,17 @@ async function loadRawPreviews() {
   await Promise.all(workers)
 }
 
+// Show directory hint only when multiple directories are scanned
+const showDirHint = computed(() => store.directories.length > 1)
+
+function getDirName(path: string): string {
+  const normalized = path.replace(/\\/g, '/')
+  const parts = normalized.split('/')
+  // Return parent folder name as short label
+  if (parts.length >= 2) return parts[parts.length - 2]
+  return ''
+}
+
 watch(filteredImages, () => {
   loadRawPreviews()
 }, { immediate: true })
@@ -143,91 +161,147 @@ watch(filteredImages, () => {
 
 <style scoped>
 .image-grid {
-  padding: 16px;
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
 }
 
-.loading, .empty {
+.loading-state,
+.empty-state {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 200px;
-  color: #999;
-  font-size: 14px;
+  gap: 12px;
+  height: 240px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
 }
 
-.image-item {
+.image-card {
   position: relative;
-  aspect-ratio: 1;
-  background: #2a2a2a;
-  border-radius: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   overflow: hidden;
   cursor: pointer;
-  border: 2px solid transparent;
-  transition: border-color 0.2s;
+  transition: all var(--transition-fast);
 }
 
-.image-item:hover {
-  border-color: #4a4a4a;
+.image-card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-elevated);
 }
 
-.image-item.selected {
-  border-color: #007acc;
+.image-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-border);
 }
 
-.image-item img {
+.card-image {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+.card-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform var(--transition-normal);
 }
 
-.image-info {
+.image-card:hover .card-image img {
+  transform: scale(1.03);
+}
+
+.raw-badge {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-  padding: 20px 8px 8px;
+  top: 6px;
+  left: 6px;
+  padding: 1px 5px;
+  background: var(--accent);
+  color: var(--bg-base);
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
+  pointer-events: none;
+  z-index: 2;
 }
 
-.image-name {
-  font-size: 11px;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.image-size {
-  font-size: 10px;
-  color: #999;
-  margin-top: 2px;
-}
-
-.checkmark {
+.select-check {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 20px;
-  height: 20px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 2px solid #fff;
-  border-radius: 50%;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
   color: #fff;
   cursor: pointer;
+  opacity: 0;
+  transition: all var(--transition-fast);
+  backdrop-filter: blur(4px);
+  z-index: 2;
 }
 
-.image-item.selected .checkmark {
-  background: #007acc;
-  border-color: #007acc;
+.image-card:hover .select-check,
+.image-card.selected .select-check {
+  opacity: 1;
+}
+
+.image-card.selected .select-check {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.card-info {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+}
+
+.card-name {
+  font-size: 11px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.card-dir {
+  font-size: 9px;
+  color: var(--accent);
+  flex-shrink: 0;
+  opacity: 0.8;
 }
 </style>

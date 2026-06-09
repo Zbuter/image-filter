@@ -1,20 +1,16 @@
 <template>
-  <div class="breadcrumb">
-    <span class="label">路径:</span>
+  <nav class="breadcrumb">
     <template v-for="(segment, index) in pathSegments" :key="index">
-      <span 
-        v-if="index > 0" 
-        class="separator"
-      >›</span>
-      <span 
+      <span v-if="index > 0" class="separator">/</span>
+      <button 
         class="segment"
         :class="{ current: index === pathSegments.length - 1 }"
         @click="navigateTo(index)"
       >
         {{ segment.name }}
-      </span>
+      </button>
     </template>
-  </div>
+  </nav>
 </template>
 
 <script setup lang="ts">
@@ -32,18 +28,24 @@ const pathSegments = computed<PathSegment[]>(() => {
   if (!store.currentDirectory) return []
   
   const path = store.currentDirectory
-  const parts = path.split('/').filter(p => p)
+  // Normalize separators and split
+  const normalized = path.replace(/\\/g, '/')
+  const isWindowsDrive = /^[A-Za-z]:/.test(normalized)
+  const parts = normalized.split('/').filter(p => p)
   const segments: PathSegment[] = []
   
-  // Handle macOS root
-  if (path.startsWith('/')) {
-    segments.push({ name: '/', path: '/' })
-  }
-  
-  // Build path segments
-  let currentPath = path.startsWith('/') ? '' : ''
-  for (const part of parts) {
-    currentPath = currentPath ? `${currentPath}/${part}` : `/${part}`
+  let currentPath = ''
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]
+    if (i === 0 && isWindowsDrive) {
+      // First part is drive letter like "C:"
+      currentPath = part + '/'
+    } else if (currentPath === '') {
+      // Unix root
+      currentPath = '/' + part
+    } else {
+      currentPath = currentPath.endsWith('/') ? currentPath + part : currentPath + '/' + part
+    }
     segments.push({
       name: part,
       path: currentPath
@@ -63,46 +65,46 @@ function navigateTo(index: number) {
 
 <style scoped>
 .breadcrumb {
-  width: 100%;
-  flex-shrink: 0;
-  background: #252525;
-  padding: 8px 16px;
-  border-bottom: 1px solid #3a3a3a;
   display: flex;
   align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.label {
-  color: #888;
-  font-size: 12px;
-  margin-right: 4px;
+  gap: 2px;
+  padding: 6px 16px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  overflow-x: auto;
+  white-space: nowrap;
 }
 
 .separator {
-  color: #666;
-  font-size: 12px;
-  margin: 0 2px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  user-select: none;
 }
 
 .segment {
-  color: #007acc;
-  font-size: 12px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 11px;
   cursor: pointer;
-  transition: color 0.2s;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
 }
 
 .segment:hover {
-  color: #0098ff;
+  background: var(--accent-muted);
+  color: var(--accent-hover);
 }
 
 .segment.current {
-  color: #ccc;
+  color: var(--text-secondary);
   cursor: default;
 }
 
 .segment.current:hover {
-  color: #ccc;
+  background: transparent;
+  color: var(--text-secondary);
 }
 </style>

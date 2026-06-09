@@ -1,6 +1,7 @@
-use image::io::Reader as ImageReader;
+use image::ImageReader;
 use std::path::Path;
 
+#[allow(dead_code)]
 pub fn get_dimensions(path: &Path) -> Result<(Option<u32>, Option<u32>), String> {
     match ImageReader::open(path) {
         Ok(reader) => {
@@ -13,6 +14,7 @@ pub fn get_dimensions(path: &Path) -> Result<(Option<u32>, Option<u32>), String>
     }
 }
 
+#[allow(dead_code)]
 pub fn decode_to_rgb(path: &Path) -> Result<image::RgbImage, String> {
     let img = ImageReader::open(path)
         .map_err(|e| format!("Failed to open image: {}", e))?
@@ -22,6 +24,7 @@ pub fn decode_to_rgb(path: &Path) -> Result<image::RgbImage, String> {
     Ok(img.to_rgb8())
 }
 
+#[allow(dead_code)]
 pub fn generate_thumbnail(path: &Path, size: u32) -> Result<image::RgbImage, String> {
     let img = decode_to_rgb(path)?;
     let (w, h) = (img.width(), img.height());

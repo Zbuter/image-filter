@@ -1,43 +1,77 @@
 <template>
   <div v-if="store.previewImage" class="preview-overlay" @click="handleOverlayClick">
+    <!-- Top Toolbar -->
     <div class="preview-toolbar">
-      <button class="toolbar-btn" @click="closePreview">✕ 关闭</button>
+      <div class="toolbar-group">
+        <button class="tool-btn" @click="closePreview" title="关闭 (Esc)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
       <div class="toolbar-divider"></div>
-      <button class="toolbar-btn" @click="zoomOut">🔍−</button>
-      <span class="zoom-level">{{ Math.round(zoom * 100) }}%</span>
-      <button class="toolbar-btn" @click="zoomIn">🔍+</button>
-      <button class="toolbar-btn" @click="resetZoom">适应</button>
+
+      <div class="toolbar-group">
+        <button class="tool-btn" @click="zoomOut" title="缩小">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        </button>
+        <span class="zoom-label">{{ Math.round(zoom * 100) }}%</span>
+        <button class="tool-btn" @click="zoomIn" title="放大">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        </button>
+        <button class="tool-btn" @click="resetZoom" title="适应窗口">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+        </button>
+      </div>
+
       <div class="toolbar-divider"></div>
-      <button class="toolbar-btn" @click="rotateLeft" title="向左旋转 (R)">↺</button>
-      <button class="toolbar-btn" @click="rotateRight" title="向右旋转 (Shift+R)">↻</button>
+
+      <div class="toolbar-group">
+        <button class="tool-btn" @click="rotateLeft" title="向左旋转 (R)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        </button>
+        <button class="tool-btn" @click="rotateRight" title="向右旋转 (Shift+R)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </button>
+      </div>
+
       <div class="toolbar-spacer"></div>
-      <span class="file-info">{{ store.previewImage.name }}</span>
-      <span class="dimension-info" v-if="store.previewImage.width && store.previewImage.height">
-        {{ store.previewImage.width }} × {{ store.previewImage.height }}
-      </span>
-      <span class="position-info">
-        {{ currentIndex + 1 }} / {{ previewList.length }}
-      </span>
+
+      <div class="file-meta">
+        <span class="file-name">{{ store.previewImage.name }}</span>
+        <span v-if="store.previewImage.width && store.previewImage.height" class="file-dims">
+          {{ store.previewImage.width }} × {{ store.previewImage.height }}
+        </span>
+        <span class="file-position">{{ currentIndex + 1 }} / {{ previewList.length }}</span>
+      </div>
+
       <div class="toolbar-divider"></div>
-      <button 
-        class="toolbar-btn select-btn"
-        :class="{ selected: isSelected }"
-        @click="toggleSelection"
-      >
-        {{ isSelected ? '✓ 已选中' : '○ 选中' }}
-      </button>
+
+      <div class="toolbar-group">
+        <button 
+          class="tool-btn select-toggle"
+          :class="{ selected: isSelected }"
+          @click="toggleSelection"
+          title="选中/取消选中"
+        >
+          <svg v-if="isSelected" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
+        </button>
+      </div>
+
       <template v-if="!inSelectedView">
-        <div class="toolbar-divider"></div>
-        <label class="toolbar-checkbox">
+        <label class="auto-switch-label" title="浏览到末尾时自动跳转到已选视图">
           <input type="checkbox" v-model="switchToSelectedAtEnd" />
-          <span>末尾跳转到已选</span>
+          <span class="auto-switch-text">末尾跳转已选</span>
         </label>
       </template>
     </div>
-    
+
+    <!-- Image Content -->
     <div class="preview-content" @wheel="handleWheel" @mousedown="handleMouseDown">
-      <button class="nav-btn prev" @click.stop="prevImage">‹</button>
-      
+      <button class="nav-btn nav-prev" @click.stop="prevImage">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+
       <div 
         class="image-wrapper"
         :style="imageWrapperStyle"
@@ -50,19 +84,18 @@
           draggable="false"
         />
       </div>
-      
-      <button class="nav-btn next" @click.stop="nextImage">›</button>
-      
-      <div class="preview-hint">
-        纵向滚轮缩放 | 横向滚轮切换 | 拖拽平移 | 双击 1:1 查看 | R 旋转
-      </div>
+
+      <button class="nav-btn nav-next" @click.stop="nextImage">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
     </div>
-    
-    <div class="thumbnail-strip">
+
+    <!-- Thumbnail Strip -->
+    <div ref="thumbnailStripRef" class="thumbnail-strip">
       <div
         v-for="(image, index) in previewList"
         :key="image.path"
-        class="thumbnail-item"
+        class="thumb"
         :class="{ current: index === currentIndex }"
         @click.stop="goToImage(index)"
       >
@@ -73,7 +106,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, reactive } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, reactive } from 'vue'
 import { useAppStore } from '../stores/app'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import type { ImageInfo } from '../types'
@@ -99,9 +132,10 @@ const dragStartY = ref(0)
 const imageLoaded = ref(false)
 const switchToSelectedAtEnd = ref(false)
 const rawPreviewUrls = reactive<Record<string, string>>({})
+const thumbnailStripRef = ref<HTMLElement | null>(null)
 
 const RAW_EXTENSIONS = ['cr2', 'cr3', 'nef', 'arw', 'dng', 'orf', 'rw2', 'pef', 'srw', 'raf']
-const placeholderUrl = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23333" width="100" height="100"/%3E%3C/svg%3E'
+const placeholderUrl = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23212125" width="100" height="100"/%3E%3C/svg%3E'
 
 const currentPreviewList = computed(() => props.previewList || store.images)
 
@@ -117,7 +151,7 @@ const isSelected = computed(() => {
 
 const imageWrapperStyle = computed(() => ({
   transform: `translate(${panX.value}px, ${panY.value}px) scale(${zoom.value}) rotate(${rotation.value}deg)`,
-  transition: isDragging.value ? 'none' : 'transform 0.2s',
+  transition: isDragging.value ? 'none' : 'transform 0.2s ease',
   transformOrigin: 'center center'
 }))
 
@@ -142,393 +176,369 @@ function getThumbnailUrl(image: ImageInfo): string {
   return convertFileSrc(image.path)
 }
 
-async function loadRawPreview(image: ImageInfo | null) {
-  if (!image || !isRawFile(image.path)) return
-  if (rawPreviewUrls[image.path]) return
-  
-  try {
-    const dataUrl = await store.getRawPreview(image.path)
-    if (dataUrl) {
-      rawPreviewUrls[image.path] = dataUrl
-    }
-  } catch (e) {
-    console.error('Failed to load RAW preview:', image.path, e)
-  }
-}
-
-async function preloadNearbyRawPreviews() {
-  const idx = currentIndex.value
-  if (idx < 0) return
-  
-  const range = 3
-  const start = Math.max(0, idx - range)
-  const end = Math.min(currentPreviewList.value.length, idx + range + 1)
-  
-  for (let i = start; i < end; i++) {
-    const img = currentPreviewList.value[i]
-    if (isRawFile(img.path) && !rawPreviewUrls[img.path]) {
-      try {
-        const dataUrl = await store.getRawPreview(img.path)
-        if (dataUrl) {
-          rawPreviewUrls[img.path] = dataUrl
-        }
-      } catch (e) {
-        // Skip errors for preloading
-      }
+watch(() => store.previewImage, async (newImg) => {
+  if (newImg && isRawFile(newImg.path) && !rawPreviewUrls[newImg.path]) {
+    try {
+      const url = await store.getRawPreview(newImg.path)
+      if (url) rawPreviewUrls[newImg.path] = url
+    } catch (e) {
+      console.error('Failed to load RAW preview:', e)
     }
   }
-}
+  resetView()
+})
 
-function handleOverlayClick(event: MouseEvent) {
-  if (event.target === event.currentTarget) {
-    closePreview()
+// Scroll thumbnail strip to keep current image visible
+watch(currentIndex, async () => {
+  await nextTick()
+  if (thumbnailStripRef.value) {
+    const current = thumbnailStripRef.value.querySelector('.thumb.current') as HTMLElement
+    if (current) {
+      current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+    }
   }
-}
+})
 
-function closePreview() {
-  store.setPreviewImage(null)
-  resetZoom()
-}
-
-function zoomIn() {
-  zoom.value = Math.min(zoom.value * 1.2, 20)
-}
-
-function zoomOut() {
-  zoom.value = Math.max(zoom.value / 1.2, 0.1)
-}
-
-function resetZoom() {
+function resetView() {
   zoom.value = 1
   panX.value = 0
   panY.value = 0
   rotation.value = 0
-}
-
-function toggleActualSize() {
-  if (zoom.value === 1) {
-    zoom.value = 2
-  } else {
-    resetZoom()
-  }
-}
-
-function rotateLeft() {
-  rotation.value = (rotation.value - 90) % 360
-}
-
-function rotateRight() {
-  rotation.value = (rotation.value + 90) % 360
-}
-
-function handleWheel(event: WheelEvent) {
-  event.preventDefault()
-  
-  // 横向滚动切换图片
-  if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
-    if (event.deltaX > 0) {
-      nextImage()
-    } else {
-      prevImage()
-    }
-    return
-  }
-  
-  // 纵向滚动缩放
-  const delta = event.deltaY > 0 ? 0.9 : 1.1
-  zoom.value = Math.max(0.1, Math.min(20, zoom.value * delta))
-}
-
-function handleMouseDown(event: MouseEvent) {
-  if (event.button !== 0) return
-  
-  isDragging.value = true
-  dragStartX.value = event.clientX - panX.value
-  dragStartY.value = event.clientY - panY.value
-  
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging.value) return
-    panX.value = e.clientX - dragStartX.value
-    panY.value = e.clientY - dragStartY.value
-  }
-  
-  const handleMouseUp = () => {
-    isDragging.value = false
-    document.removeEventListener('mousemove', handleMouseMove)
-    document.removeEventListener('mouseup', handleMouseUp)
-  }
-  
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseup', handleMouseUp)
-}
-
-function prevImage() {
-  const list = currentPreviewList.value
-  if (list.length === 0) return
-  const newIndex = currentIndex.value <= 0 ? list.length - 1 : currentIndex.value - 1
-  store.setPreviewImage(list[newIndex])
-  resetZoom()
-}
-
-function nextImage() {
-  const list = currentPreviewList.value
-  if (list.length === 0) return
-  
-  if (currentIndex.value >= list.length - 1) {
-    // At the last image
-    if (switchToSelectedAtEnd.value && store.selectedCount > 0) {
-      // Switch to selected images view
-      closePreview()
-      // Emit event to switch view (will be handled by parent)
-      emit('switch-to-selected')
-      return
-    }
-    // Otherwise wrap around
-    store.setPreviewImage(list[0])
-  } else {
-    store.setPreviewImage(list[currentIndex.value + 1])
-  }
-  resetZoom()
-}
-
-function goToImage(index: number) {
-  if (index >= 0 && index < currentPreviewList.value.length) {
-    store.setPreviewImage(currentPreviewList.value[index])
-    resetZoom()
-  }
-}
-
-function toggleSelection() {
-  if (store.previewImage) {
-    store.toggleImageSelection(store.previewImage)
-  }
+  imageLoaded.value = false
 }
 
 function handleImageLoad() {
   imageLoaded.value = true
 }
 
-function handleKeydown(event: KeyboardEvent) {
+function closePreview() {
+  store.setPreviewImage(null)
+}
+
+function handleOverlayClick(e: MouseEvent) {
+  if (e.target === e.currentTarget) closePreview()
+}
+
+function zoomIn() { zoom.value = Math.min(zoom.value * 1.3, 10) }
+function zoomOut() { zoom.value = Math.max(zoom.value / 1.3, 0.1) }
+function resetZoom() { zoom.value = 1; panX.value = 0; panY.value = 0 }
+function toggleActualSize() { zoom.value = zoom.value === 1 ? 2 : 1 }
+function rotateLeft() { rotation.value -= 90 }
+function rotateRight() { rotation.value += 90 }
+
+function prevImage() {
+  if (currentIndex.value > 0) {
+    store.setPreviewImage(currentPreviewList.value[currentIndex.value - 1])
+  } else if (switchToSelectedAtEnd.value && !props.inSelectedView) {
+    emit('switch-to-selected')
+  }
+}
+
+function nextImage() {
+  if (currentIndex.value < currentPreviewList.value.length - 1) {
+    store.setPreviewImage(currentPreviewList.value[currentIndex.value + 1])
+  } else if (switchToSelectedAtEnd.value && !props.inSelectedView) {
+    emit('switch-to-selected')
+  }
+}
+
+function goToImage(index: number) {
+  store.setPreviewImage(currentPreviewList.value[index])
+}
+
+function toggleSelection() {
+  if (store.previewImage) store.toggleImageSelection(store.previewImage)
+}
+
+function handleWheel(e: WheelEvent) {
+  e.preventDefault()
+  if (e.ctrlKey || e.metaKey) {
+    // Ctrl+scroll: zoom
+    const delta = e.deltaY > 0 ? 0.9 : 1.1
+    zoom.value = Math.max(0.1, Math.min(10, zoom.value * delta))
+  } else if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+    // Horizontal scroll: navigate
+    if (e.deltaX > 0) nextImage()
+    else prevImage()
+  } else {
+    // Vertical scroll: zoom
+    const delta = e.deltaY > 0 ? 0.95 : 1.05
+    zoom.value = Math.max(0.1, Math.min(10, zoom.value * delta))
+  }
+}
+
+function handleMouseDown(e: MouseEvent) {
+  if (e.button !== 0) return
+  isDragging.value = true
+  dragStartX.value = e.clientX - panX.value
+  dragStartY.value = e.clientY - panY.value
+}
+
+function handleMouseMove(e: MouseEvent) {
+  if (!isDragging.value) return
+  panX.value = e.clientX - dragStartX.value
+  panY.value = e.clientY - dragStartY.value
+}
+
+function handleMouseUp() {
+  isDragging.value = false
+}
+
+function isInputFocused(): boolean {
+  const el = document.activeElement
+  if (!el) return false
+  const tag = el.tagName.toLowerCase()
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || (el as HTMLElement).isContentEditable
+}
+
+function handleKeydown(e: KeyboardEvent) {
   if (!store.previewImage) return
-  
-  switch (event.key) {
-    case 'Escape':
-      closePreview()
-      break
-    case 'ArrowLeft':
-      prevImage()
-      break
-    case 'ArrowRight':
-      nextImage()
-      break
+  if (isInputFocused()) return
+  switch (e.key) {
+    case 'Escape': closePreview(); break
+    case 'ArrowLeft': prevImage(); break
+    case 'ArrowRight': nextImage(); break
     case ' ':
-      event.preventDefault()
-      toggleSelection()
+      e.preventDefault()
+      toggleSelectionAndAdvance()
       break
-    case 'r':
-    case 'R':
-      if (event.shiftKey) {
-        rotateRight()
-      } else {
-        rotateLeft()
-      }
+    case 'r': case 'R':
+      if (e.shiftKey) rotateRight()
+      else rotateLeft()
       break
   }
 }
 
+function toggleSelectionAndAdvance() {
+  // Use the computed ref which reflects current state before toggle
+  const wasSelected = isSelected.value
+  toggleSelection()
+  if (!wasSelected) {
+    nextImage()
+  }
+}
+
 onMounted(() => {
-  document.addEventListener('keydown', handleKeydown)
+  window.addEventListener('mousemove', handleMouseMove)
+  window.addEventListener('mouseup', handleMouseUp)
+  window.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('mousemove', handleMouseMove)
+  window.removeEventListener('mouseup', handleMouseUp)
+  window.removeEventListener('keydown', handleKeydown)
 })
-
-watch(() => store.previewImage, async (newImage) => {
-  resetZoom()
-  imageLoaded.value = false
-  if (newImage) {
-    await loadRawPreview(newImage)
-    preloadNearbyRawPreviews()
-  }
-}, { immediate: true })
 </script>
 
 <style scoped>
 .preview-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: #0a0a0a;
+  inset: 0;
   z-index: 1000;
   display: flex;
   flex-direction: column;
+  background: rgba(10, 10, 12, 0.95);
+  backdrop-filter: blur(8px);
 }
 
+/* ── Toolbar ─────────────────────────────────────── */
 .preview-toolbar {
-  background: rgba(30, 30, 30, 0.95);
-  padding: 10px 16px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  z-index: 10;
+  gap: 6px;
+  padding: 0 12px;
+  height: 40px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
 }
 
-.toolbar-btn {
-  background: transparent;
-  border: none;
-  color: #ccc;
-  font-size: 13px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-
-.toolbar-btn:hover {
-  background: #3a3a3a;
-}
-
-.toolbar-btn.select-btn.selected {
-  background: #007acc;
-  color: #fff;
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .toolbar-divider {
   width: 1px;
-  height: 20px;
-  background: #444;
+  height: 18px;
+  background: var(--border-subtle);
+  margin: 0 4px;
+  flex-shrink: 0;
 }
 
 .toolbar-spacer {
   flex: 1;
 }
 
-.zoom-level, .file-info, .dimension-info, .position-info {
-  color: #ccc;
-  font-size: 13px;
-}
-
-.dimension-info, .position-info {
-  color: #888;
-  font-size: 12px;
-  margin-left: 12px;
-}
-
-.preview-content {
-  flex: 1;
+.tool-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.tool-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.select-toggle.selected {
+  color: var(--accent);
+}
+
+.select-toggle.selected:hover {
+  background: var(--accent-muted);
+}
+
+.zoom-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  min-width: 36px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.file-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.file-name {
+  color: var(--text-primary);
+  max-width: 240px;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-dims {
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.file-position {
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.auto-switch-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  cursor: pointer;
+}
+
+.auto-switch-label input {
+  accent-color: var(--accent);
+  width: 12px;
+  height: 12px;
+}
+
+.auto-switch-text {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+/* ── Image Content ───────────────────────────────── */
+.preview-content {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+}
+
+.image-wrapper {
+  max-width: 90%;
+  max-height: 90%;
+}
+
+.image-wrapper img {
+  max-width: 100%;
+  max-height: calc(100vh - 140px);
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
 }
 
 .nav-btn {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 44px;
-  height: 44px;
-  background: rgba(40, 40, 40, 0.8);
-  border: 1px solid #444;
-  border-radius: 50%;
-  color: #fff;
-  font-size: 20px;
-  cursor: pointer;
-  z-index: 5;
-  transition: background 0.2s;
-}
-
-.nav-btn:hover {
-  background: rgba(60, 60, 60, 0.9);
-}
-
-.nav-btn.prev {
-  left: 16px;
-}
-
-.nav-btn.next {
-  right: 16px;
-}
-
-.image-wrapper {
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  backdrop-filter: blur(4px);
+  z-index: 10;
 }
 
-.image-wrapper img {
-  display: block;
-  max-width: 90vw;
-  max-height: calc(100vh - 140px);
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+.nav-btn:hover {
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
-.preview-hint {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(30, 30, 30, 0.9);
-  padding: 6px 12px;
-  border-radius: 4px;
-  color: #888;
-  font-size: 12px;
-}
+.nav-prev { left: 16px; }
+.nav-next { right: 16px; }
 
+/* ── Thumbnail Strip ─────────────────────────────── */
 .thumbnail-strip {
-  background: rgba(30, 30, 30, 0.95);
-  padding: 8px 16px;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 4px;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
   overflow-x: auto;
+  flex-shrink: 0;
 }
 
-.thumbnail-item {
+.thumb {
   width: 48px;
   height: 48px;
   flex-shrink: 0;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   cursor: pointer;
-  opacity: 0.5;
   border: 2px solid transparent;
-  transition: all 0.2s;
+  opacity: 0.5;
+  transition: all var(--transition-fast);
 }
 
-.thumbnail-item:hover {
+.thumb:hover {
   opacity: 0.8;
 }
 
-.thumbnail-item.current {
+.thumb.current {
+  border-color: var(--accent);
   opacity: 1;
-  border-color: #007acc;
 }
 
-.thumbnail-item img {
+.thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.toolbar-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #ccc;
-  font-size: 13px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.toolbar-checkbox input[type="checkbox"] {
-  cursor: pointer;
 }
 </style>

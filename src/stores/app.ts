@@ -3,13 +3,10 @@ import { ref, computed } from 'vue'
 import type { ImageInfo } from '../types'
 import { invoke } from '@tauri-apps/api/core'
 
-const IMAGE_EXTENSIONS = [
-  'jpg', 'jpeg', 'png', 'gif', 'webp', 'tiff', 'tif', 'bmp',
-  'cr2', 'cr3', 'nef', 'arw', 'dng', 'orf', 'rw2', 'pef', 'srw', 'raf',
-]
 const RAW_EXTENSIONS = ['cr2', 'cr3', 'nef', 'arw', 'dng', 'orf', 'rw2', 'pef', 'srw', 'raf']
 
 export const useAppStore = defineStore('app', () => {
+  const directories = ref<string[]>([])
   const currentDirectory = ref<string>('')
   const images = ref<ImageInfo[]>([])
   const selectedImageMap = ref<Map<string, ImageInfo>>(new Map())
@@ -24,16 +21,44 @@ export const useAppStore = defineStore('app', () => {
   const allSelectedImages = computed(() => Array.from(selectedImageMap.value.values()))
 
   async function loadDirectory(path: string) {
+    // Single directory mode: replace directories list
+    directories.value = [path]
+    currentDirectory.value = path
+    await rescanImages()
+  }
+
+  async function addDirectory(path: string) {
+    if (!directories.value.includes(path)) {
+      directories.value.push(path)
+    }
+    await rescanImages()
+  }
+
+  async function removeDirectory(path: string) {
+    directories.value = directories.value.filter(d => d !== path)
+    if (directories.value.length > 0) {
+      currentDirectory.value = directories.value[directories.value.length - 1]
+    } else {
+      currentDirectory.value = ''
+    }
+    await rescanImages()
+  }
+
+  async function rescanImages() {
     scanGeneration.value++
     const gen = scanGeneration.value
     try {
       loading.value = true
-      currentDirectory.value = path
-      const imgs = await invoke<any[]>('scan_images', { directory: path })
+      const dirs = directories.value.length > 0 ? directories.value : []
+      if (dirs.length === 0) {
+        images.value = []
+        return
+      }
+      const imgs = await invoke<any[]>('scan_images', { directories: dirs })
       if (gen !== scanGeneration.value) return
       images.value = imgs
     } catch (e) {
-      console.error('Failed to load directory:', e)
+      console.error('Failed to scan images:', e)
     } finally {
       if (gen === scanGeneration.value) {
         loading.value = false
@@ -66,17 +91,6 @@ export const useAppStore = defineStore('app', () => {
     const newMap = new Map(selectedImageMap.value)
     if (newMap.has(image.path)) {
       newMap.delete(image.path)
-      // If the deselected image is being previewed, jump to next/prev
-      if (previewImage.value?.path === image.path) {
-        const remaining = Array.from(newMap.values())
-        if (remaining.length === 0) {
-          previewImage.value = null
-        } else {
-          const idx = allSelectedImages.value.findIndex(img => img.path === image.path)
-          const nextIdx = idx >= remaining.length ? remaining.length - 1 : idx
-          previewImage.value = remaining[nextIdx]
-        }
-      }
     } else {
       newMap.set(image.path, image)
     }
@@ -99,14 +113,36 @@ export const useAppStore = defineStore('app', () => {
     selectedImageMap.value = new Map()
   }
 
+  function invertSelection() {
+    const newMap = new Map<string, ImageInfo>()
+    for (const img of images.value) {
+      if (!selectedImageMap.value.has(img.path)) {
+        newMap.set(img.path, img)
+      }
+    }
+    selectedImageMap.value = newMap
+  }
+
   function setPreviewImage(image: ImageInfo | null) {
     previewImage.value = image
   }
 
+  /** Get the effective export path: rawPath if available, otherwise the image path */
+  function getExportPath(image: ImageInfo): string {
+    return image.rawPath || image.path
+  }
+
   async function exportImages(targetDir: string) {
     try {
-      const sources = Array.from(selectedImageMap.value.keys())
-      const progress = await invoke<any>('export_images', { sources, targetDir })
+      // Export both JPG and RAW when paired
+      const sources: string[] = []
+      for (const img of selectedImageMap.value.values()) {
+        sources.push(img.path) // Always include the primary file (JPG)
+        if (img.rawPath) {
+          sources.push(img.rawPath) // Also include paired RAW
+        }
+      }
+      const progress = await invoke<any>('export_images', { sources, targetDir: targetDir })
       return progress
     } catch (e) {
       console.error('Failed to export images:', e)
@@ -115,6 +151,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   return {
+    directories,
     currentDirectory,
     images,
     selectedImageMap,
@@ -127,13 +164,18 @@ export const useAppStore = defineStore('app', () => {
     scanGeneration,
     rawPreviewCache,
     loadDirectory,
+    addDirectory,
+    removeDirectory,
+    rescanImages,
     getRawPreview,
     isCurrentGeneration,
     toggleImageSelection,
     isImageSelected,
     selectAll,
     clearSelection,
+    invertSelection,
     setPreviewImage,
+    getExportPath,
     exportImages
   }
 })

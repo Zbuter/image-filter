@@ -23,6 +23,8 @@ export interface ImageInfo {
   size: number
   width: number | null
   height: number | null
+  /** Paired RAW file path when a same-name RAW exists */
+  rawPath?: string
 }
 
 export interface ExportProgress {

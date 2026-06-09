@@ -1,15 +1,17 @@
 <template>
-  <div class="status-bar">
+  <footer class="status-bar">
     <div class="status-left">
-      <span class="status-item">共 {{ store.totalImages }} 张图片</span>
       <span class="status-item">
-        已选择: <span class="highlight">{{ store.selectedCount }} 张</span>
+        {{ store.totalImages }} 张图片
+      </span>
+      <span v-if="store.selectedCount > 0" class="status-item status-selected">
+        已选 {{ store.selectedCount }}
       </span>
     </div>
     <div class="status-right">
-      <span class="shortcuts">Ctrl+点击多选 | 滚轮缩放 | ←→ 切换</span>
+      <span class="shortcut-hint">Ctrl+点击多选 · Ctrl+A全选 · Ctrl+I反选 · Ctrl+F搜索</span>
     </div>
-  </div>
+  </footer>
 </template>
 
 <script setup lang="ts">
@@ -20,37 +22,34 @@ const store = useAppStore()
 
 <style scoped>
 .status-bar {
-  background: #2a2a2a;
-  padding: 6px 16px;
-  border-top: 1px solid #3a3a3a;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
-  height: 28px;
+  height: var(--statusbar-height);
+  padding: 0 12px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
+  font-size: 11px;
+  flex-shrink: 0;
 }
 
 .status-left {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
 }
-
 
 .status-item {
-  color: #888;
+  color: var(--text-tertiary);
 }
 
-.highlight {
-  color: #007acc;
+.status-selected {
+  color: var(--accent);
   font-weight: 500;
 }
 
-.status-right {
-  color: #666;
-}
-
-.shortcuts {
-  font-size: 11px;
+.shortcut-hint {
+  color: var(--text-disabled);
+  font-size: 10px;
 }
 </style>

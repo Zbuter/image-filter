@@ -13,31 +13,31 @@
       <div class="export-info">
         <p>将导出 <strong>{{ store.selectedCount }}</strong> 张图片</p>
       </div>
-      
+
       <div class="target-path">
         <label>目标目录:</label>
         <div class="path-input">
-          <input 
-            type="text" 
-            :value="targetPath" 
-            readonly 
+          <input
+            type="text"
+            :value="targetPath"
+            readonly
             placeholder="请选择目标目录"
           />
           <button @click="selectDirectory" :disabled="exporting">选择</button>
         </div>
       </div>
-      
+
       <div v-if="exporting" class="export-progress">
-        <n-progress 
-          type="line" 
-          :percentage="progress" 
+        <n-progress
+          type="line"
+          :percentage="progress"
           :status="progressStatus"
         />
         <p class="progress-text">
           已导出 {{ completedCount }} / {{ store.selectedCount }}
         </p>
       </div>
-      
+
       <div v-if="exportError" class="export-error">
         <p>导出失败: {{ exportError }}</p>
       </div>
@@ -100,20 +100,20 @@ async function selectDirectory() {
 
 async function handleExport() {
   if (!targetPath.value) return
-  
+
   try {
     exporting.value = true
     exportError.value = ''
     completedCount.value = 0
-    
+
     const result = await store.exportImages(targetPath.value)
-    
+
     completedCount.value = result.completed
-    
+
     if (result.failed.length > 0) {
       exportError.value = `${result.failed.length} 个文件导出失败`
     }
-    
+
     if (result.completed > 0) {
       emit('exported')
       setTimeout(() => {
@@ -126,8 +126,8 @@ async function handleExport() {
   } finally {
     exporting.value = false
   }
-  
-  return false // Prevent modal from closing immediately
+
+  return false
 }
 
 function handleCancel() {
@@ -153,7 +153,7 @@ function reset() {
 
 .export-info p {
   margin: 0;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .target-path {
@@ -163,8 +163,8 @@ function reset() {
 .target-path label {
   display: block;
   margin-bottom: 8px;
-  color: #fff;
-  font-size: 13px;
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .path-input {
@@ -174,31 +174,32 @@ function reset() {
 
 .path-input input {
   flex: 1;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  border-radius: 4px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
-  color: #fff;
-  font-size: 13px;
+  color: var(--text-primary);
+  font-size: 12px;
 }
 
 .path-input button {
-  background: #3a3a3a;
-  border: none;
-  border-radius: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   padding: 6px 12px;
-  color: #fff;
-  font-size: 13px;
+  color: var(--text-primary);
+  font-size: 12px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .path-input button:hover:not(:disabled) {
-  background: #4a4a4a;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 .path-input button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -208,22 +209,22 @@ function reset() {
 
 .progress-text {
   margin-top: 8px;
-  color: #888;
-  font-size: 12px;
+  color: var(--text-tertiary);
+  font-size: 11px;
   text-align: center;
 }
 
 .export-error {
   margin-top: 16px;
   padding: 10px;
-  background: rgba(220, 50, 50, 0.1);
-  border: 1px solid rgba(220, 50, 50, 0.3);
-  border-radius: 4px;
+  background: rgba(212, 83, 83, 0.08);
+  border: 1px solid rgba(212, 83, 83, 0.2);
+  border-radius: var(--radius-sm);
 }
 
 .export-error p {
   margin: 0;
-  color: #ff6b6b;
-  font-size: 13px;
+  color: var(--danger);
+  font-size: 12px;
 }
 </style>
