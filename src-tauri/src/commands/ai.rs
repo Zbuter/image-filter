@@ -7,7 +7,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::Manager;
-use tauri_plugin_http::reqwest;
 
 /// Waste photo detection labels (must match labels.txt order)
 const LABELS: &[&str] = &[
@@ -885,3 +884,45 @@ pub fn check_ai_model_exists(app: tauri::AppHandle) -> bool {
         && model_dir.join("text_embeddings.bin").exists()
 }
 
+/// Extract AI model zip to app data directory
+#[tauri::command]
+pub async fn extract_ai_model_zip(
+    app: tauri::AppHandle,
+    zip_path: String,
+) -> Result<String, String> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    let model_dir = data_dir.join("ai-models");
+    std::fs::create_dir_all(&model_dir)
+        .map_err(|e| format!("Failed to create model dir: {}", e))?;
+
+    let file = std::fs::File::open(&zip_path)
+        .map_err(|e| format!("Failed to open zip: {}", e))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| format!("Failed to read zip: {}", e))?;
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i)
+            .map_err(|e| format!("Failed to read zip entry: {}", e))?;
+        let name = entry.name().to_string();
+        if name.ends_with('/') || name.starts_with("__MACOSX") { continue; }
+        let out_name = if let Some(pos) = name.find('/') {
+            &name[pos + 1..]
+        } else {
+            &name
+        };
+        if out_name.is_empty() { continue; }
+        let out_path = model_dir.join(out_name);
+        if let Some(parent) = out_path.parent() {
+            std::fs::create_dir_all(parent).ok();
+        }
+        let mut out_file = std::fs::File::create(&out_path)
+            .map_err(|e| format!("Failed to create {}: {}", out_name, e))?;
+        std::io::copy(&mut entry, &mut out_file)
+            .map_err(|e| format!("Failed to extract {}: {}", out_name, e))?;
+    }
+
+    Ok(model_dir.to_string_lossy().to_string())
+}
