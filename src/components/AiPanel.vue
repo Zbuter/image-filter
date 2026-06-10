@@ -18,8 +18,8 @@
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="ai-icon"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93L12 22"/><path d="M8 6a4 4 0 0 1 .65-2.18"/><path d="M17 12.5c1.77.64 3 2.34 3 4.28A4.5 4.5 0 0 1 15.5 21h-7A4.5 4.5 0 0 1 4 16.78c0-1.94 1.23-3.64 3-4.28"/></svg>
       <p v-if="downloading">下载中... {{ downloadProgress }}</p>
       <p v-else>模型未加载</p>
-      <button v-if="!downloading" class="btn btn-primary btn-sm" @click="downloadModel">下载 AI 模型</button>
-      <button v-if="!downloading" class="btn btn-ghost btn-sm" @click="$emit('loadModel')">本地加载</button>
+      <button v-if="!downloading" class="btn btn-primary btn-sm" @click="downloadModel">获取 AI 模型</button>
+      <button v-if="!downloading" class="btn btn-ghost btn-sm" @click="$emit('loadModel')">从 ZIP 加载</button>
     </div>
 
     <!-- Analyzing state -->

@@ -273,7 +273,7 @@ async function toggleAiPanel() {
   async function loadModel() {
     console.log('[AI] loadModel called, aiModelLoaded:', store.aiModelLoaded);
     try {
-      // First check if model already downloaded
+      // First check if model already exists
       const exists = await invoke<boolean>('check_ai_model_exists');
       if (exists && !store.aiModelLoaded) {
         const modelDir = await invoke<string>('get_ai_model_dir');
@@ -283,17 +283,16 @@ async function toggleAiPanel() {
         }
         return;
       }
-      // Otherwise open directory picker
+      // Open file picker for zip
       const { open } = await import('@tauri-apps/plugin-dialog');
-      const selected = await open({ directory: true, multiple: false, title: '选择 AI 模型目录' });
+      const selected = await open({ directory: false, multiple: false, title: '选择 AI 模型压缩包', filters: [{ name: 'ZIP', extensions: ['zip'] }] });
       if (selected) {
-        aiModelDir.value = selected as string;
-        console.log('[AI] Calling initAiModel with:', selected);
-          await store.initAiModel(selected as string);
-          // Save model path for auto-load next time
-          await invoke('save_model_path', { modelDir: selected });
-          console.log('[AI] initAiModel completed, aiModelLoaded:', store.aiModelLoaded);
-          if (store.images.length > 0) {
+        console.log('[AI] Extracting model from:', selected);
+        const modelDir = await invoke<string>('extract_ai_model_zip', { zipPath: selected });
+        await store.initAiModel(modelDir);
+        await invoke('save_model_path', { modelDir });
+        console.log('[AI] initAiModel completed, aiModelLoaded:', store.aiModelLoaded);
+        if (store.images.length > 0) {
           await runAiAnalysis();
         } else {
           alert('AI 模型加载成功，但当前没有图片可分析。请先打开一个包含图片的目录。');
@@ -303,7 +302,6 @@ async function toggleAiPanel() {
       console.error('Failed to load AI model:', e);
       alert('AI 模型加载失败: ' + String(e));
     }
-  }
 
 async function runAiAnalysis() {
   const paths = store.images.map(img => img.path);

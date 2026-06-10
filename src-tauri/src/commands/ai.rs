@@ -835,7 +835,7 @@ pub fn load_model_path(app: tauri::AppHandle) -> Result<Option<String>, String> 
     }
 }
 
-/// Download AI model from GitHub Release to app data directory
+/// Open browser to download AI model, then user extracts to app data directory
 #[tauri::command]
 pub async fn download_ai_model(
     app: tauri::AppHandle,
@@ -853,66 +853,14 @@ pub async fn download_ai_model(
         return Ok(model_dir.to_string_lossy().to_string());
     }
 
-    std::fs::create_dir_all(&model_dir)
-        .map_err(|e| format!("Failed to create model dir: {}", e))?;
+    // Open browser for manual download
+    let url = "https://nas.hosee.icu:8888/sharing/VVLuOtym3";
+    open::that(url).map_err(|e| format!("Failed to open browser: {}", e))?;
 
-    // Download zip from GitHub Release
-    let url = "https://github.com/Zbuter/image-filter/releases/download/ai-models-v1/ai-models.zip";
-    let client = reqwest::Client::new();
-    let response = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|e| format!("Download failed: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!(
-            "Download failed with status: {}",
-            response.status()
-        ));
-    }
-
-    let _total_size = response.content_length().unwrap_or(0);
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| format!("Failed to read response: {}", e))?;
-
-
-    // Save zip temporarily
-    let zip_path = model_dir.join("ai-models.zip");
-    std::fs::write(&zip_path, &bytes)
-        .map_err(|e| format!("Failed to save zip: {}", e))?;
-
-    // Extract zip
-    let file = std::fs::File::open(&zip_path)
-        .map_err(|e| format!("Failed to open zip: {}", e))?;
-    let mut archive = zip::ZipArchive::new(file)
-        .map_err(|e| format!("Failed to read zip: {}", e))?;
-
-    for i in 0..archive.len() {
-        let mut entry = archive
-            .by_index(i)
-            .map_err(|e| format!("Failed to read zip entry: {}", e))?;
-        let name = entry.name().to_string();
-        // Skip directories and __MACOSX
-        if name.ends_with('/') || name.starts_with("__MACOSX") {
-            continue;
-        }
-        let out_path = model_dir.join(&name);
-        if let Some(parent) = out_path.parent() {
-            std::fs::create_dir_all(parent).ok();
-        }
-        let mut out_file = std::fs::File::create(&out_path)
-            .map_err(|e| format!("Failed to create {}: {}", name, e))?;
-        std::io::copy(&mut entry, &mut out_file)
-            .map_err(|e| format!("Failed to extract {}: {}", name, e))?;
-    }
-
-    // Clean up zip
-    std::fs::remove_file(&zip_path).ok();
-
-    Ok(model_dir.to_string_lossy().to_string())
+    Err(format!(
+        "请在浏览器中下载模型文件并解压到: {}",
+        model_dir.to_string_lossy()
+    ))
 }
 
 /// Get the expected model directory path

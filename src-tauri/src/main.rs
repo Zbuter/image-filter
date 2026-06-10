@@ -31,6 +31,7 @@ fn main() {
             ai::download_ai_model,
             ai::get_ai_model_dir,
             ai::check_ai_model_exists,
+            ai::extract_ai_model_zip,
             ai::mark_image_feedback,
             ai::retrain_classifier,
             ai::get_feedback_count,
