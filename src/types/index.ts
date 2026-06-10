@@ -21,6 +21,7 @@ export interface ImageInfo {
   path: string
   extension: string
   size: number
+  modified: number
   width: number | null
   height: number | null
   /** Paired RAW file path when a same-name RAW exists */
@@ -31,4 +32,23 @@ export interface ExportProgress {
   total: number
   completed: number
   failed: string[]
+}
+
+export interface AiAnalysisResult {
+  path: string
+  labels: string[]
+  scores: number[]
+  is_waste: boolean
+}
+
+export interface DuplicateEntry {
+  path: string
+  score: number
+  similarity: number
+}
+
+export interface DuplicateGroup {
+  best_path: string
+  best_score: number
+  duplicates: DuplicateEntry[]
 }

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ImageInfo } from '../types'
+import type { ImageInfo, AiAnalysisResult, DuplicateGroup } from '../types'
 import { invoke } from '@tauri-apps/api/core'
 
 const RAW_EXTENSIONS = ['cr2', 'cr3', 'nef', 'arw', 'dng', 'orf', 'rw2', 'pef', 'srw', 'raf']
@@ -14,6 +14,13 @@ export const useAppStore = defineStore('app', () => {
   const loading = ref(false)
   const rawPreviewCache = ref<Map<string, string>>(new Map())
   const scanGeneration = ref(0)
+  const aiResults = ref<AiAnalysisResult[]>([])
+  const aiAnalyzing = ref(false)
+  const aiProgress = ref(0)
+  const aiTotal = ref(0)
+  const aiModelLoaded = ref(false)
+  const feedbackCount = ref(0)
+  const feedbackMap = ref<Map<string, boolean>>(new Map())
 
   const selectedImages = computed(() => new Set(selectedImageMap.value.keys()))
   const selectedCount = computed(() => selectedImageMap.value.size)
@@ -150,6 +157,160 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+
+  async function initAiModel(modelDir: string) {
+    console.log('[AI] initAiModel called with:', modelDir);
+    try {
+      await invoke('init_ai_model', { modelDir });
+      console.log('[AI] init_ai_model succeeded');
+      aiModelLoaded.value = true;
+      console.log('[AI] aiModelLoaded set to true')
+    } catch (e) {
+      console.error('[AI] Failed to init AI model:', e)
+      throw e
+    }
+  }
+
+  async function startAiAnalysis(paths: string[]) {
+    if (!aiModelLoaded.value) {
+      throw new Error('AI model not loaded')
+    }
+    aiAnalyzing.value = true
+    aiProgress.value = 0
+    aiTotal.value = paths.length
+    aiResults.value = []
+
+    const batchSize = 7
+    for (let i = 0; i < paths.length; i += batchSize) {
+      const batch = paths.slice(i, i + batchSize)
+      try {
+        const results = await invoke('analyze_images', { paths: batch })
+        aiResults.value.push(...results)
+        aiProgress.value = Math.min(i + batchSize, paths.length)
+      } catch (e) {
+        console.error('AI analysis batch failed:', e)
+      }
+    }
+
+    aiAnalyzing.value = false
+
+    // Auto-select waste images
+    const wastePaths = new Set(aiResults.value.filter(r => r.is_waste).map(r => r.path))
+    if (wastePaths.size > 0) {
+      const newMap = new Map(selectedImageMap.value)
+      for (const img of images.value) {
+        if (wastePaths.has(img.path)) {
+          newMap.set(img.path, img)
+        }
+      }
+      selectedImageMap.value = newMap
+    }
+  }
+
+  function getWasteImages() {
+    return aiResults.value.filter(r => r.is_waste)
+  }
+
+  function selectWasteImages() {
+    const wastePaths = new Set(getWasteImages().map(r => r.path))
+    const newMap = new Map(selectedImageMap.value)
+    for (const img of images.value) {
+      if (wastePaths.has(img.path)) {
+        newMap.set(img.path, img)
+      }
+    }
+    selectedImageMap.value = newMap
+  }
+
+  function excludeWasteImages() {
+    const wastePaths = new Set(getWasteImages().map(r => r.path))
+    const newMap = new Map(selectedImageMap.value)
+    for (const path of wastePaths) {
+      newMap.delete(path)
+    }
+    selectedImageMap.value = newMap
+  }
+
+  
+  async function loadFeedbackCount() {
+    try {
+      const count = await invoke<number>('get_feedback_count')
+      feedbackCount.value = count
+    } catch (e) {
+      console.error('[AI] Failed to load feedback count:', e)
+    }
+  }
+
+  async function markImageFeedback(path: string, isWaste: boolean) {
+    try {
+      const count = await invoke<number>('mark_image_feedback', { path, isWaste })
+      feedbackCount.value = count
+      // Update local map using path as key (for current session visual feedback)
+      feedbackMap.value.set(path, isWaste)
+      feedbackMap.value = new Map(feedbackMap.value)
+      return count
+    } catch (e) {
+      console.error('[AI] Failed to mark feedback:', e)
+      throw e
+    }
+  }
+
+  
+  function isMarkedWaste(path: string): boolean {
+    return feedbackMap.value.get(path) === true
+  }
+
+  function isMarkedNotWaste(path: string): boolean {
+    return feedbackMap.value.get(path) === false
+  }
+
+  function isMarked(path: string): boolean {
+    return feedbackMap.value.has(path)
+  }
+
+  async function hydrateFeedback() {
+    try {
+      const count = await invoke<number>('get_feedback_count')
+      feedbackCount.value = count
+    } catch (e) {
+      console.error('[AI] Failed to hydrate feedback:', e)
+    }
+  }
+
+  
+  const duplicateGroups = ref<DuplicateGroup[]>([])
+  const dedupDetecting = ref(false)
+
+  async function detectDuplicates(paths: string[]) {
+    dedupDetecting.value = true
+    try {
+      const groups = await invoke<DuplicateGroup[]>('detect_duplicates', { paths })
+      duplicateGroups.value = groups
+      return groups
+    } catch (e) {
+      console.error('[AI] Duplicate detection failed:', e)
+      throw e
+    } finally {
+      dedupDetecting.value = false
+    }
+  }
+
+  async function markDuplicatesAsWaste(duplicatePaths: string[]) {
+    try {
+      const count = await invoke<number>('mark_duplicates_as_waste', { duplicatePaths })
+      feedbackCount.value = count
+      return count
+    } catch (e) {
+      console.error('[AI] Failed to mark duplicates:', e)
+      throw e
+    }
+  }
+
+  function resetAiResults() {
+    aiResults.value = []
+    aiProgress.value = 0
+    aiTotal.value = 0
+  }
   return {
     directories,
     currentDirectory,
@@ -176,6 +337,29 @@ export const useAppStore = defineStore('app', () => {
     invertSelection,
     setPreviewImage,
     getExportPath,
-    exportImages
+    exportImages,
+    aiResults,
+    aiAnalyzing,
+    aiProgress,
+    aiTotal,
+    aiModelLoaded,
+    initAiModel,
+    startAiAnalysis,
+    getWasteImages,
+    selectWasteImages,
+    excludeWasteImages,
+    resetAiResults,
+    feedbackCount,
+    loadFeedbackCount,
+    markImageFeedback,
+    feedbackMap,
+    isMarkedWaste,
+    isMarkedNotWaste,
+    isMarked,
+    hydrateFeedback,
+    duplicateGroups,
+    dedupDetecting,
+    detectDuplicates,
+    markDuplicatesAsWaste
   }
 })

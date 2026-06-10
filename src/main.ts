@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import { NConfigProvider, darkTheme } from 'naive-ui'
 import App from './App.vue'
 import './style.css'
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 
 const app = createApp({
   render() {

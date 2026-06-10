@@ -51,6 +51,14 @@
         <!-- Extensible slot for future AI features -->
         <slot name="toolbar-actions"></slot>
 
+        <button 
+          class="btn btn-ghost"
+          :class="{ active: sidebarMode === 'ai' }"
+          @click="toggleAiPanel"
+          title="AI 废片检测"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93L12 22"/><path d="M8 6a4 4 0 0 1 .65-2.18"/><path d="M17 12.5c1.77.64 3 2.34 3 4.28A4.5 4.5 0 0 1 15.5 21h-7A4.5 4.5 0 0 1 4 16.78c0-1.94 1.23-3.64 3-4.28"/></svg>
+        </button>
         <div class="view-switcher">
           <button 
             class="switcher-btn"
@@ -87,13 +95,41 @@
     <!-- Main Content -->
     <div class="main-content">
       <aside class="sidebar">
-        <DirectoryTree />
+        <DirectoryTree v-if="sidebarMode === 'directory'" />
+        <AiPanel 
+          v-else 
+          @load-model="loadModel"
+          @preview="previewFromAi"
+          @start-analysis="runAiAnalysis"
+          @hover-waste="handleHoverWaste"
+          @waste-context-menu="handleWasteContextMenu"
+          @detect-duplicates="runDedupDetection"
+          @mark-all-duplicates="markAllDuplicates"
+          @mark-group-duplicates="markGroupDuplicates"
+          @ignore-group="ignoreGroup"
+        />
       </aside>
+
+      <!-- Waste Context Menu -->
+      <Teleport to="body">
+        <div
+          v-if="wasteCtxMenu.visible"
+          class="context-menu"
+          :style="{ left: wasteCtxMenu.x + 'px', top: wasteCtxMenu.y + 'px' }"
+          @click.stop
+        >
+          <button class="ctx-item" @click="markWasteAsGood">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            标记为非废片
+          </button>
+        </div>
+      </Teleport>
 
       <main class="content">
         <div v-if="currentView === 'directory'" class="content-inner">
           <Breadcrumb />
           <ImageGrid 
+            :highlighted-waste-path="highlightedWastePath"
             :filter-text="filterText"
             :file-type-filter="fileTypeFilter"
             :custom-extensions="customExtensions"
@@ -122,6 +158,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useAppStore } from './stores/app'
 import DirectoryTree from './components/DirectoryTree.vue'
+import AiPanel from './components/AiPanel.vue'
 import Breadcrumb from './components/Breadcrumb.vue'
 import ImageGrid from './components/ImageGrid.vue'
 import SelectedImagesView from './components/SelectedImagesView.vue'
@@ -134,6 +171,34 @@ const filterText = ref('')
 const fileTypeFilter = ref<'all' | 'raw' | 'regular' | 'custom'>('all')
 const customExtensions = ref('')
 const currentView = ref<'directory' | 'selected'>('directory')
+// Hide waste context menu on click
+  document.addEventListener('click', hideWasteCtxMenu)
+
+  // Auto-load AI model and feedback on startup
+    ;(async () => {
+      try {
+        // Try saved model path first
+        const savedPath = await invoke<string | null>('load_model_path')
+        if (savedPath) {
+          await store.initAiModel(savedPath)
+          console.log('[AI] Auto-loaded model from saved path:', savedPath)
+        } else {
+          // Fallback: check default ai-models dir
+          const exists = await invoke<boolean>('check_ai_model_exists')
+          if (exists) {
+            const modelDir = await invoke<string>('get_ai_model_dir')
+            await store.initAiModel(modelDir)
+            console.log('[AI] Auto-loaded model from default dir')
+          }
+        }
+      } catch (e) {
+        console.log('[AI] No model found, will load manually later')
+      }
+      await store.hydrateFeedback()
+  })()
+
+const sidebarMode = ref<'directory' | 'ai'>('directory')
+const aiModelDir = ref('')
 const checkingUpdate = ref(false)
 const updateMessage = ref('')
 
@@ -150,7 +215,8 @@ async function selectDirectory() {
       directory: true,
       multiple: false,
     })
-    if (selected) {
+    console.log('[AI] Directory selected:', selected, typeof selected);
+        if (selected) {
       await store.loadDirectory(selected as string)
     }
   } catch (e) {
@@ -194,6 +260,139 @@ function formatError(error: unknown) {
   }
   return String(error)
 }
+
+
+async function toggleAiPanel() {
+    if (sidebarMode.value === 'ai') {
+      sidebarMode.value = 'directory';
+    } else {
+      sidebarMode.value = 'ai';
+    }
+  }
+
+  async function loadModel() {
+    console.log('[AI] loadModel called, aiModelLoaded:', store.aiModelLoaded);
+    try {
+      // First check if model already downloaded
+      const exists = await invoke<boolean>('check_ai_model_exists');
+      if (exists && !store.aiModelLoaded) {
+        const modelDir = await invoke<string>('get_ai_model_dir');
+        await store.initAiModel(modelDir);
+        if (store.images.length > 0 && store.aiResults.length === 0) {
+          await runAiAnalysis();
+        }
+        return;
+      }
+      // Otherwise open directory picker
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({ directory: true, multiple: false, title: '选择 AI 模型目录' });
+      if (selected) {
+        aiModelDir.value = selected as string;
+        console.log('[AI] Calling initAiModel with:', selected);
+          await store.initAiModel(selected as string);
+          // Save model path for auto-load next time
+          await invoke('save_model_path', { modelDir: selected });
+          console.log('[AI] initAiModel completed, aiModelLoaded:', store.aiModelLoaded);
+          if (store.images.length > 0) {
+          await runAiAnalysis();
+        } else {
+          alert('AI 模型加载成功，但当前没有图片可分析。请先打开一个包含图片的目录。');
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load AI model:', e);
+      alert('AI 模型加载失败: ' + String(e));
+    }
+  }
+
+async function runAiAnalysis() {
+  const paths = store.images.map(img => img.path);
+  if (paths.length === 0) return;
+  await store.startAiAnalysis(paths);
+}
+
+function previewFromAi(path: string) {
+  const img = store.images.find(i => i.path === path);
+  if (img) {
+    store.setPreviewImage(img);
+  }
+}
+
+
+  const highlightedWastePath = ref<string | null>(null)
+  const wasteCtxMenu = ref({ visible: false, x: 0, y: 0, path: '' })
+
+  function handleHoverWaste(path: string | null) {
+    highlightedWastePath.value = path
+  }
+
+  function handleWasteContextMenu(e: MouseEvent, path: string) {
+    wasteCtxMenu.value = { visible: true, x: e.clientX, y: e.clientY, path }
+  }
+
+  async function markWasteAsGood() {
+    const path = wasteCtxMenu.value.path
+    wasteCtxMenu.value.visible = false
+    if (!path) return
+    try {
+      await store.markImageFeedback(path, false)
+      // Re-analyze to update results
+      await runAiAnalysis()
+    } catch (e) {
+      console.error('Failed to mark:', e)
+    }
+  }
+
+  function hideWasteCtxMenu() {
+    wasteCtxMenu.value.visible = false
+  }
+
+
+  async function runDedupDetection() {
+    const paths = store.images.map(img => img.path)
+    if (paths.length === 0) return
+    try {
+      await store.detectDuplicates(paths)
+    } catch (e) {
+      console.error('Dedup failed:', e)
+    }
+  }
+
+  async function markAllDuplicates() {
+    const allDupPaths: string[] = []
+    for (const group of store.duplicateGroups) {
+      for (const dup of group.duplicates) {
+        allDupPaths.push(dup.path)
+      }
+    }
+    if (allDupPaths.length === 0) return
+    try {
+      await store.markDuplicatesAsWaste(allDupPaths)
+      store.duplicateGroups = []
+      // Re-analyze to update waste list
+      await runAiAnalysis()
+    } catch (e) {
+      console.error('Failed to mark duplicates:', e)
+    }
+  }
+
+
+  async function markGroupDuplicates(group: any) {
+    const dupPaths = group.duplicates.map((d: any) => d.path)
+    if (dupPaths.length === 0) return
+    try {
+      await store.markDuplicatesAsWaste(dupPaths)
+      // Remove this group from display
+      store.duplicateGroups = store.duplicateGroups.filter(g => g.best_path !== group.best_path)
+      await runAiAnalysis()
+    } catch (e) {
+      console.error('Failed to mark group duplicates:', e)
+    }
+  }
+
+  function ignoreGroup(index: number) {
+    store.duplicateGroups.splice(index, 1)
+  }
 
 async function checkUpdate() {
   try {
@@ -264,9 +463,11 @@ function handleKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   document.addEventListener('keydown', handleKeydown)
+  document.addEventListener('click', hideWasteCtxMenu)
 })
 
 onUnmounted(() => {
+  document.removeEventListener('click', hideWasteCtxMenu)
   document.removeEventListener('keydown', handleKeydown)
 })
 </script>
@@ -351,6 +552,11 @@ onUnmounted(() => {
 .btn-ghost:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.btn-ghost.active {
+  color: var(--accent);
+  background: var(--accent-muted);
 }
 
 .btn:disabled {
@@ -559,4 +765,41 @@ onUnmounted(() => {
   background: var(--danger);
   color: #fff;
 }
+
+/* Waste Context Menu (global, used by Teleport) */
+.context-menu {
+  position: fixed;
+  z-index: 2000;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 4px 0;
+  min-width: 160px;
+}
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  text-align: left;
+}
+
+.ctx-item:hover {
+  background: var(--bg-hover);
+}
+
+.ctx-item svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
 </style>

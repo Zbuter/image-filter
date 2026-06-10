@@ -5,11 +5,13 @@ use std::path::PathBuf;
 use crate::image_decoder;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ImageInfo {
     pub name: String,
     pub path: String,
     pub extension: String,
     pub size: u64,
+    pub modified: u64,
     pub width: Option<u32>,
     pub height: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -71,11 +73,17 @@ pub fn scan_images(directories: Vec<String>) -> Result<Vec<ImageInfo>, String> {
                             let metadata = entry.metadata().ok();
                             let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
 
+                            let modified = metadata.as_ref()
+                                    .and_then(|m| m.modified().ok())
+                                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                                    .map(|d| d.as_secs())
+                                    .unwrap_or(0);
                             all_images.push(ImageInfo {
                                 name,
                                 path: entry_path.to_string_lossy().to_string(),
                                 extension,
                                 size,
+                                modified,
                                 width: None,
                                 height: None,
                                 raw_path: None,

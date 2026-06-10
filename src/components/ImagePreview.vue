@@ -34,6 +34,27 @@
         </button>
       </div>
 
+      <div class="toolbar-group feedback-group">
+        <button 
+          class="tool-btn waste-btn"
+          :class="{ active: store.previewImage && store.isMarkedWaste(store.previewImage.path) }"
+          @click="markFeedback(true)"
+          title="标记为废片 (D)"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <button 
+          class="tool-btn good-btn"
+          :class="{ active: store.previewImage && store.isMarkedNotWaste(store.previewImage.path) }"
+          @click="markFeedback(false)"
+          title="标记为非废片 (F)"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+      </div>
+
+      <div class="toolbar-divider"></div>
+
       <div class="toolbar-spacer"></div>
 
       <div class="file-meta">
@@ -102,6 +123,10 @@
         <img :src="getThumbnailUrl(image)" :alt="image.name" />
       </div>
     </div>
+      <!-- Feedback Toast -->
+    <Transition name="toast-fade">
+      <div v-if="feedbackToast" class="feedback-toast">{{ feedbackToast }}</div>
+    </Transition>
   </div>
 </template>
 
@@ -302,7 +327,15 @@ function handleKeydown(e: KeyboardEvent) {
       e.preventDefault()
       toggleSelectionAndAdvance()
       break
-    case 'r': case 'R':
+    case 'd': case 'D':
+        e.preventDefault()
+        markFeedback(true)
+        break
+      case 'f': case 'F':
+        e.preventDefault()
+        markFeedback(false)
+        break
+      case 'r': case 'R':
       if (e.shiftKey) rotateRight()
       else rotateLeft()
       break
@@ -318,7 +351,24 @@ function toggleSelectionAndAdvance() {
   }
 }
 
-onMounted(() => {
+
+  // AI feedback toast
+  const feedbackToast = ref('')
+  let toastTimer: ReturnType<typeof setTimeout> | null = null
+
+  async function markFeedback(isWaste: boolean) {
+    if (!store.previewImage) return
+    try {
+      const count = await store.markImageFeedback(store.previewImage.path, isWaste)
+      feedbackToast.value = isWaste ? `已标记废片 (共 ${count} 条)` : `已标记非废片 (共 ${count} 条)`
+      if (toastTimer) clearTimeout(toastTimer)
+      toastTimer = setTimeout(() => { feedbackToast.value = '' }, 1500)
+    } catch (e) {
+      console.error('Failed to mark feedback:', e)
+    }
+  }
+
+  onMounted(() => {
   window.addEventListener('mousemove', handleMouseMove)
   window.addEventListener('mouseup', handleMouseUp)
   window.addEventListener('keydown', handleKeydown)
@@ -541,4 +591,81 @@ onUnmounted(() => {
   height: 100%;
   object-fit: cover;
 }
+
+/* Feedback Toast */
+.feedback-toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 20px;
+  background: var(--accent);
+  color: var(--bg-base);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 1001;
+  pointer-events: none;
+  box-shadow: var(--shadow-md);
+}
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(10px);
+}
+
+
+/* Feedback Toggle Buttons */
+.feedback-group {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px;
+}
+
+.waste-btn,
+.good-btn {
+  width: 28px;
+  height: 24px;
+  border-radius: 3px;
+}
+
+.waste-btn {
+  color: var(--text-tertiary);
+}
+
+.waste-btn:hover {
+  color: var(--danger);
+  background: rgba(212, 83, 83, 0.1);
+}
+
+.waste-btn.active {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.good-btn {
+  color: var(--text-tertiary);
+}
+
+.good-btn:hover {
+  color: var(--success);
+  background: rgba(92, 184, 122, 0.1);
+}
+
+.good-btn.active {
+  color: #fff;
+  background: var(--success);
+  border-color: var(--success);
+}
+
 </style>
