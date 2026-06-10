@@ -302,6 +302,7 @@ async function toggleAiPanel() {
       console.error('Failed to load AI model:', e);
       alert('AI 模型加载失败: ' + String(e));
     }
+  }
 
 async function runAiAnalysis() {
   const paths = store.images.map(img => img.path);
