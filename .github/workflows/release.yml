@@ -15,9 +15,14 @@ jobs:
       matrix:
         include:
           - platform: 'macos-latest'
-            args: '--target universal-apple-darwin'
+            target: 'aarch64-apple-darwin'
+            ort_url: 'https://github.com/microsoft/onnxruntime/releases/download/v1.21.0/onnxruntime-osx-arm64-1.21.0.tgz'
+          - platform: 'macos-latest'
+            target: 'x86_64-apple-darwin'
+            ort_url: 'https://github.com/microsoft/onnxruntime/releases/download/v1.21.0/onnxruntime-osx-x64-1.21.0.tgz'
           - platform: 'windows-latest'
-            args: ''
+            target: ''
+            ort_url: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -33,12 +38,22 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.target }}
 
       - name: Install dependencies (macOS)
         if: matrix.platform == 'macos-latest'
         run: |
           brew install libpng
+
+      - name: Download ONNX Runtime (macOS)
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: |
+          mkdir -p ort-lib
+          curl -L "${{ matrix.ort_url }}" -o ort.tgz
+          tar xzf ort.tgz -C ort-lib --strip-components=1
+          echo "ORT_LIB_LOCATION=$PWD/ort-lib/lib" >> $GITHUB_ENV
+          echo "ORT_DYLIB_PATH=$PWD/ort-lib/lib/libonnxruntime.dylib" >> $GITHUB_ENV
 
       - name: Install frontend dependencies
         run: npm install
@@ -48,7 +63,7 @@ jobs:
         shell: bash
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          CHANGELOG=$(awk "/^## \[${VERSION}\]/{flag=1;next}/^## \[/{flag=0}flag" CHANGELOG.md)
+          CHANGELOG=$(awk "/^## \[$VERSION\]/{flag=1;next}/^## \[/{flag=0}flag" CHANGELOG.md)
           if [ -z "$CHANGELOG" ]; then
             CHANGELOG="See assets to download this version."
           fi
@@ -62,6 +77,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          ORT_LIB_LOCATION: ${{ env.ORT_LIB_LOCATION }}
+          ORT_DYLIB_PATH: ${{ env.ORT_DYLIB_PATH }}
         with:
           tagName: v__VERSION__
           releaseName: "Image Filter v__VERSION__"
@@ -70,4 +87,4 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
-          args: ${{ matrix.args }}
+          args: ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}
