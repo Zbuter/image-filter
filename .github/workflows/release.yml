@@ -24,7 +24,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          lfs: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -41,13 +40,11 @@ jobs:
         run: |
           brew install libpng
 
-      - name: Extract ONNX Runtime (macOS)
+      - name: Set ORT env (macOS)
         if: matrix.platform == 'macos-latest'
         shell: bash
         run: |
-          mkdir -p src-tauri/onnxruntime/osx-universal2
-          tar xzf src-tauri/onnxruntime/osx-universal2.tgz -C src-tauri/onnxruntime/osx-universal2 --strip-components=1
-          echo "ORT_LIB_LOCATION=$GITHUB_WORKSPACE/src-tauri/onnxruntime/osx-universal2/lib" >> $GITHUB_ENV
+          echo "ORT_LIB_LOCATION=$GITHUB_WORKSPACE/src-tauri/onnxruntime/osx-universal2" >> $GITHUB_ENV
           echo "ORT_PREFER_DYNAMIC_LINK=1" >> $GITHUB_ENV
 
       - name: Set ORT env (Windows)
