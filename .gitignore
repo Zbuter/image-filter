@@ -33,3 +33,4 @@ updater.key.pub
 package-lock.json
 
 
+.codegraph/

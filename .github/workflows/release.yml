@@ -40,11 +40,13 @@ jobs:
         run: |
           brew install libpng
 
-      - name: Set ORT env (macOS)
+      - name: Extract ONNX Runtime (macOS)
         if: matrix.platform == 'macos-latest'
         shell: bash
         run: |
-          echo "ORT_LIB_LOCATION=$GITHUB_WORKSPACE/src-tauri/onnxruntime/osx-universal2" >> $GITHUB_ENV
+          mkdir -p src-tauri/onnxruntime/osx-universal2
+          tar xzf src-tauri/onnxruntime/osx-universal2.tgz -C src-tauri/onnxruntime/osx-universal2 --strip-components=1
+          echo "ORT_LIB_LOCATION=$GITHUB_WORKSPACE/src-tauri/onnxruntime/osx-universal2/lib" >> $GITHUB_ENV
           echo "ORT_PREFER_DYNAMIC_LINK=1" >> $GITHUB_ENV
 
       - name: Set ORT env (Windows)
@@ -52,7 +54,6 @@ jobs:
         shell: pwsh
         run: |
           echo "ORT_LIB_LOCATION=$env:GITHUB_WORKSPACE\src-tauri\onnxruntime\win-x64" >> $env:GITHUB_ENV
-          echo "ORT_PREFER_DYNAMIC_LINK=1" >> $env:GITHUB_ENV
 
       - name: Install frontend dependencies
         run: npm install
