@@ -17,12 +17,15 @@ jobs:
           - platform: 'macos-latest'
             target: 'aarch64-apple-darwin'
             ort_url: 'https://github.com/microsoft/onnxruntime/releases/download/v1.21.0/onnxruntime-osx-arm64-1.21.0.tgz'
+            ort_ext: 'tgz'
           - platform: 'macos-latest'
             target: 'x86_64-apple-darwin'
             ort_url: 'https://github.com/microsoft/onnxruntime/releases/download/v1.21.0/onnxruntime-osx-x64-1.21.0.tgz'
+            ort_ext: 'tgz'
           - platform: 'windows-latest'
             target: ''
-            ort_url: ''
+            ort_url: 'https://github.com/microsoft/onnxruntime/releases/download/v1.21.0/onnxruntime-win-x64-1.21.0.zip'
+            ort_ext: 'zip'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -53,7 +56,16 @@ jobs:
           curl -L "${{ matrix.ort_url }}" -o ort.tgz
           tar xzf ort.tgz -C ort-lib --strip-components=1
           echo "ORT_LIB_LOCATION=$PWD/ort-lib/lib" >> $GITHUB_ENV
-          echo "ORT_DYLIB_PATH=$PWD/ort-lib/lib/libonnxruntime.dylib" >> $GITHUB_ENV
+
+      - name: Download ONNX Runtime (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ort-lib
+          Invoke-WebRequest -Uri "${{ matrix.ort_url }}" -OutFile ort.zip
+          Expand-Archive -Path ort.zip -DestinationPath ort-lib -Force
+          $libDir = (Get-ChildItem ort-lib -Directory | Select-Object -First 1).FullName + '\lib'
+          echo "ORT_LIB_LOCATION=$libDir" >> $env:GITHUB_ENV
 
       - name: Install frontend dependencies
         run: npm install
@@ -78,7 +90,6 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           ORT_LIB_LOCATION: ${{ env.ORT_LIB_LOCATION }}
-          ORT_DYLIB_PATH: ${{ env.ORT_DYLIB_PATH }}
         with:
           tagName: v__VERSION__
           releaseName: "Image Filter v__VERSION__"
