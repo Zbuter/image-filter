@@ -1,2 +1,0 @@
-src-tauri/onnxruntime/** filter=lfs diff=lfs merge=lfs -text
-src-tauri/onnxruntime/*.tgz filter=lfs diff=lfs merge=lfs -text
