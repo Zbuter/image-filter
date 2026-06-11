@@ -33,6 +33,3 @@ updater.key.pub
 package-lock.json
 
 
-# AI Models (large files, download from NAS)
-models/
-src-tauri/onnxruntime/
