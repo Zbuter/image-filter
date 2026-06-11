@@ -14,4 +14,5 @@ fn main() {
     };
 
     println!("cargo:rustc-env=ORT_LIB_LOCATION={}", lib_dir);
+    println!("cargo:rustc-env=ORT_STRATEGY=system");
 }
