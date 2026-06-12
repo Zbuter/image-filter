@@ -48,7 +48,7 @@ npx tauri build  # Full Tauri bundle
 
 ### 废片检测流程
 ```
-图像输入 → 图像质量分析 → 人脸检测+表情分析 → CLIP零样本分类 → 特征融合 → 废片判定
+图像输入 → 图像质量分析 → 人脸检测+表情分析 → 特征融合 → 废片判定
 ```
 
 ### 废片类型
@@ -60,9 +60,11 @@ npx tauri build  # Full Tauri bundle
 | 皱眉 | 眼睛眯缝 + 嘴巴紧闭 |
 | 头部倾斜 | 眼睛关键点水平偏移 |
 | 过曝/欠曝 | 亮度直方图分析 |
+| 皮肤过曝 | 皮肤区域曝光比例（婚礼人像专用） |
 | 人脸模糊 | 人脸区域 Laplacian 方差 |
 | 运动模糊 | 锐度均匀性分析 |
 | 重复图 | CLIP embedding 余弦相似度 |
+| 截图 | UI元素特征 + 纯色背景 + 文字截图检测 |
 
 ### Key Dependencies
 - **ONNX Runtime**: Pre-built binaries in `src-tauri/onnxruntime/{win-x64,osx-universal2,linux-x64}`
@@ -77,7 +79,6 @@ Registered in `main.rs`, invoked via `invoke('command_name', args)`:
 - `scan_images`, `get_raw_preview`, `export_images`
 - `init_waste_detector`, `analyze_waste_images`, `mark_waste_feedback`
 - `get_waste_feedback_count`, `get_waste_config`, `update_waste_config`
-- `download_waste_model`, `get_waste_model_dir`, `check_waste_model_exists`, `extract_waste_model_zip`
 - `detect_duplicates`, `mark_duplicates_as_waste`
 - `check_for_updates`, `install_update`
 
@@ -94,7 +95,7 @@ Registered in `main.rs`, invoked via `invoke('command_name', args)`:
 - macOS: `brew install libpng`
 
 ### Release Flow
-1. Update version in `package.json` AND `src-tauri/tauri.conf.json`
+1. Update version in `package.json` AND `src-tauri/tauri.conf.json` AND `src-tauri/Cargo.toml`
 2. Update `CHANGELOG.md`
 3. `git tag v<version> && git push origin main --tags`
 4. GitHub Actions builds Windows + macOS, publishes to Releases
@@ -111,3 +112,4 @@ Registered in `main.rs`, invoked via `invoke('command_name', args)`:
 - AI models are downloaded at runtime, not bundled
 - `package-lock.json` is gitignored — use `npm install` to regenerate
 - Windows: ONNX Runtime DLL must be in the binary's directory or system PATH
+- Version number must be pure numeric (e.g. `1.0.1`), MSI doesn't support `beta` suffix
