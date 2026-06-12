@@ -1,5 +1,5 @@
 <template>
-  <div class="image-grid">
+  <div class="image-grid" ref="gridContainer">
     <div v-if="store.loading" class="loading-state">
       <div class="spinner"></div>
       <span>加载中...</span>
@@ -8,47 +8,42 @@
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
       <span>暂无图片</span>
     </div>
-    <RecycleScroller
-      v-else
-      ref="scrollerRef"
-      class="scroller"
-      :items="imageRows"
-      :item-size="220"
-      key-field="id"
-    >
-      <template #default="{ item: row }">
-        <div class="grid-row">
-          <div 
-            v-for="image in row.images" 
-            :key="image.path"
-            class="image-card"
-            :class="{ selected: store.isImageSelected(image.path), 'waste-highlight': props.highlightedWastePath === image.path || store.scrollTarget === image.path, 'marked-waste': store.isMarkedWaste(image.path), 'marked-good': store.isMarkedNotWaste(image.path) }"
-            @click="handleClick(image, $event)"
-            @dblclick="handleDoubleClick(image)"
-            @contextmenu.prevent="showContextMenu($event, image)"
-          >
-            <div class="card-image">
-              <img :src="getImageUrl(image.path)" :alt="image.name" loading="lazy" />
-              <span v-if="store.isMarkedWaste(image.path)" class="waste-badge">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </span>
-              <span v-else-if="store.isMarkedNotWaste(image.path)" class="good-badge">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </span>
-              <div v-if="store.isMarkedWaste(image.path)" class="waste-overlay"></div>
-              <button class="select-check" @click.stop="toggleSelection(image)">
-                <svg v-if="store.isImageSelected(image.path)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </button>
-            </div>
-            <div class="card-info">
-              <span v-if="image.rawPath" class="raw-tag">RAW</span>
-              <span class="card-name" :title="image.name">{{ image.name }}</span>
-              <span class="card-dir" v-if="showDirHint" :title="getDirName(image.path)">{{ getDirName(image.path) }}</span>
-            </div>
+    <div v-else class="grid-scroll">
+      <div class="grid" :style="{ gridTemplateColumns: `repeat(${cols}, 1fr)` }">
+        <div
+          v-for="image in filteredImages"
+          :key="image.path"
+          class="image-card"
+          :class="{ selected: store.isImageSelected(image.path), 'waste-highlight': props.highlightedWastePath === image.path || store.scrollTarget === image.path, 'marked-waste': store.isMarkedWaste(image.path), 'marked-good': store.isMarkedNotWaste(image.path) }"
+          @click="handleClick(image, $event)"
+          @dblclick="handleDoubleClick(image)"
+          @contextmenu.prevent="showContextMenu($event, image)"
+        >
+          <div class="card-image">
+            <img :src="getImageUrl(image.path)" :alt="image.name" loading="lazy" />
+            <span v-if="store.isMarkedWaste(image.path)" class="waste-badge">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </span>
+            <span v-else-if="store.isMarkedNotWaste(image.path)" class="good-badge">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </span>
+            <div v-if="store.isMarkedWaste(image.path)" class="waste-overlay"></div>
+            <span v-if="store.getGroupForImage(image.path)" class="group-tag"
+                  :style="{ background: store.getGroupForImage(image.path)!.color }">
+              {{ store.getGroupForImage(image.path)!.name }}
+            </span>
+            <button class="select-check" @click.stop="toggleSelection(image)">
+              <svg v-if="store.isImageSelected(image.path)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+          </div>
+          <div class="card-info">
+            <span v-if="image.rawPath" class="raw-tag">RAW</span>
+            <span class="card-name" :title="image.name">{{ image.name }}</span>
+            <span class="card-dir" v-if="showDirHint" :title="getDirName(image.path)">{{ getDirName(image.path) }}</span>
           </div>
         </div>
-      </template>
-    </RecycleScroller>
+      </div>
+    </div>
 
     <!-- Context Menu -->
     <Teleport to="body">
@@ -67,6 +62,23 @@
           标记为非废片
         </button>
         <div class="ctx-divider"></div>
+        <div class="ctx-submenu">
+          <span class="ctx-submenu-label">添加到分组</span>
+          <button v-for="g in store.groups" :key="g.id" class="ctx-item" @click="addToGroupCtx(g.id)">
+            <span class="ctx-dot" :style="{ background: g.color }"></span>
+            {{ g.name }}
+            <span class="ctx-shortcut">{{ g.shortcut }}</span>
+          </button>
+          <button class="ctx-item" @click="showNewGroup">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            新建分组...
+          </button>
+          <button v-if="store.getGroupForImage(contextMenu.image?.path || '')" class="ctx-item ctx-item-danger" @click="removeFromGroupCtx">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            移除分组
+          </button>
+        </div>
+        <div class="ctx-divider"></div>
         <button class="ctx-item ctx-item-danger" @click="deleteFromCtx()">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           删除
@@ -77,46 +89,55 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, ref, onMounted, onUnmounted } from 'vue'
-import { RecycleScroller } from 'vue-virtual-scroller'
+import { computed, watch, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useAppStore } from '../stores/app'
 import type { ImageInfo } from '../types'
 import { convertFileSrc } from '@tauri-apps/api/core'
 
 const props = defineProps<{
   highlightedWastePath?: string | null
-
   filterText: string
   fileTypeFilter: 'all' | 'raw' | 'regular' | 'custom'
   customExtensions: string
 }>()
 
+const emit = defineEmits<{
+  newGroup: [imagePath: string]
+}>()
+
 const store = useAppStore()
-const scrollerRef = ref<any>(null)
+const gridContainer = ref<HTMLElement | null>(null)
+const cols = ref(5)
+
+function updateCols() {
+  if (!gridContainer.value) return
+  const width = gridContainer.value.clientWidth - 24
+  const cardMinWidth = 140
+  const gap = 8
+  cols.value = Math.max(1, Math.floor((width + gap) / (cardMinWidth + gap)))
+}
+
+onMounted(() => {
+  updateCols()
+  window.addEventListener('resize', updateCols)
+})
+onUnmounted(() => {
+  window.removeEventListener('resize', updateCols)
+})
 
 // 滚动到指定路径的图片
 function scrollToPath(path: string) {
   const idx = filteredImages.value.findIndex(img => img.path === path)
   if (idx === -1) return
-  const rowIndex = Math.floor(idx / COLS)
-  if (scrollerRef.value) {
-    scrollerRef.value.scrollToItem(rowIndex)
-  }
-  // 设置高亮
   store.setScrollTarget(path)
+  // 滚动到元素
+  nextTick(() => {
+    const el = gridContainer.value?.querySelector(`[data-path="${path}"]`)
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  })
 }
 
 defineExpose({ scrollToPath })
-
-const COLS = 5
-const imageRows = computed(() => {
-  const imgs = filteredImages.value
-  const rows = []
-  for (let i = 0; i < imgs.length; i += COLS) {
-    rows.push({ id: i, images: imgs.slice(i, i + COLS) })
-  }
-  return rows
-})
 
 const contextMenu = ref({ visible: false, x: 0, y: 0, image: null as ImageInfo | null })
 
@@ -143,10 +164,31 @@ async function deleteFromCtx() {
   const img = contextMenu.value.image
   hideContextMenu()
   if (!img) return
-  // 从 images 列表中移除（仅前端）
   const idx = store.images.findIndex(i => i.path === img.path)
   if (idx !== -1) {
     store.images.splice(idx, 1)
+  }
+}
+
+function addToGroupCtx(groupId: string) {
+  const img = contextMenu.value.image
+  hideContextMenu()
+  if (!img) return
+  store.addToGroup(img.path, groupId)
+}
+
+function removeFromGroupCtx() {
+  const img = contextMenu.value.image
+  hideContextMenu()
+  if (!img) return
+  store.removeFromGroup(img.path)
+}
+
+function showNewGroup() {
+  const img = contextMenu.value.image
+  hideContextMenu()
+  if (img) {
+    emit('newGroup', img.path)
   }
 }
 
@@ -273,8 +315,21 @@ watch(filteredImages, () => {
 <style scoped>
 .image-grid {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.grid-scroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.grid {
+  display: grid;
+  gap: 8px;
 }
 
 .loading-state,
@@ -357,6 +412,19 @@ watch(filteredImages, () => {
   letter-spacing: 0.5px;
   line-height: 1.6;
   margin-bottom: 2px;
+}
+
+.group-tag {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #fff;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .select-check {
@@ -462,6 +530,33 @@ watch(filteredImages, () => {
   margin: 4px 0;
 }
 
+.ctx-submenu {
+  padding: 2px 0;
+}
+
+.ctx-submenu-label {
+  display: block;
+  padding: 4px 12px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ctx-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ctx-shortcut {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
 .ctx-item svg {
   flex-shrink: 0;
   color: var(--text-secondary);
@@ -479,12 +574,11 @@ watch(filteredImages, () => {
   align-items: center;
   justify-content: center;
   background: var(--danger);
-  color: #fff;
   border-radius: 50%;
+  color: #fff;
   z-index: 2;
 }
 
-/* Good Badge */
 .good-badge {
   position: absolute;
   top: 6px;
@@ -495,58 +589,101 @@ watch(filteredImages, () => {
   align-items: center;
   justify-content: center;
   background: var(--success);
-  color: #fff;
   border-radius: 50%;
+  color: #fff;
+  z-index: 2;
   opacity: 0;
   transition: opacity var(--transition-fast);
-  z-index: 2;
 }
 
-.image-card.marked-good:hover .good-badge {
+.image-card:hover .good-badge {
   opacity: 1;
 }
 
-/* Waste Overlay */
 .waste-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(212, 83, 83, 0.25);
+  background: rgba(212, 83, 83, 0.15);
+  pointer-events: none;
   z-index: 1;
+}
+
+.group-tag {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #fff;
+  z-index: 2;
   pointer-events: none;
 }
 
-/* Marked waste card style */
-.image-card.marked-waste {
-  border-color: rgba(212, 83, 83, 0.4);
+.select-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--transition-fast);
+  backdrop-filter: blur(4px);
+  z-index: 2;
 }
 
-.image-card.marked-waste .card-name {
-  color: var(--text-tertiary);
-  text-decoration: line-through;
+.image-card:hover .select-check,
+.image-card.selected .select-check {
+  opacity: 1;
 }
 
-
-
-/* Waste Highlight from AI Panel hover */
-.image-card.waste-highlight {
+.image-card.selected .select-check {
+  background: var(--accent);
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-border);
 }
 
-.image-card.waste-highlight .card-image img {
-  transform: scale(1.05);
+.raw-tag {
+  font-size: 9px;
+  padding: 1px 4px;
+  background: rgba(212, 160, 83, 0.2);
+  color: var(--accent);
+  border-radius: 2px;
+  font-weight: 600;
 }
 
-
-.scroller {
-  flex: 1;
-  overflow-y: auto;
+.card-info {
+  padding: 6px 8px;
 }
 
-.grid-row {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-  padding: 0 0 8px 0;
+.card-name {
+  display: block;
+  font-size: 11px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-dir {
+  display: block;
+  font-size: 9px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style>

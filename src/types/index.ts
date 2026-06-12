@@ -34,6 +34,16 @@ export interface ExportProgress {
   failed: string[]
 }
 
+// 图片分组
+export interface ImageGroup {
+  id: string
+  name: string
+  shortcut: string
+  color: string
+}
+
+export type ExportFormat = 'both' | 'raw' | 'regular'
+
 // 废片检测结果
 export interface WasteResult {
   path: string

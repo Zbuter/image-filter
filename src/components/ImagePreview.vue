@@ -59,6 +59,11 @@
 
       <div class="file-meta">
         <span class="file-name">{{ store.previewImage.name }}</span>
+        <span v-for="g in currentGroups" :key="g.id" class="preview-group-tag"
+              :style="{ background: g.color }">
+          {{ g.name }}
+          <span class="preview-group-shortcut">{{ g.shortcut }}</span>
+        </span>
         <span v-if="store.previewImage.width && store.previewImage.height" class="file-dims">
           {{ store.previewImage.width }} × {{ store.previewImage.height }}
         </span>
@@ -172,6 +177,11 @@ const currentIndex = computed(() => {
 const isSelected = computed(() => {
   if (!store.previewImage) return false
   return store.isImageSelected(store.previewImage.path)
+})
+
+const currentGroups = computed(() => {
+  if (!store.previewImage) return []
+  return store.getGroupsForImage(store.previewImage.path)
 })
 
 const imageWrapperStyle = computed(() => ({
@@ -344,6 +354,13 @@ function handleKeydown(e: KeyboardEvent) {
       if (e.shiftKey) rotateRight()
       else rotateLeft()
       break
+      default:
+        // 分组快捷键
+        if (store.isGroupShortcut(e.key)) {
+          e.preventDefault()
+          store.handleGroupShortcut(e.key, store.previewImage.path)
+        }
+        break
   }
 }
 
@@ -475,6 +492,23 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.preview-group-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.preview-group-shortcut {
+  font-size: 10px;
+  opacity: 0.7;
+  font-weight: 600;
 }
 
 .file-dims {

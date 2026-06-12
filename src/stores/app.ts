@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import type { ImageInfo, DuplicateGroup } from '../types'
+import { ref, computed, watch } from 'vue'
+import type { ImageInfo, ImageGroup, ExportFormat } from '../types'
 import { invoke } from '@tauri-apps/api/core'
 
 const RAW_EXTENSIONS = ['cr2', 'cr3', 'nef', 'arw', 'dng', 'orf', 'rw2', 'pef', 'srw', 'raf']
@@ -47,6 +47,11 @@ export const useAppStore = defineStore('app', () => {
   const wasteFeedbackCount = ref(0)
   const wasteConfig = ref<WasteConfig | null>(null)
   const scrollTarget = ref<string | null>(null)
+
+  // 分组状态
+  const groups = ref<ImageGroup[]>([])
+  const groupMap = ref<Map<string, string[]>>(new Map()) // path -> [groupId, ...]
+  const exportFormat = ref<ExportFormat>('both')
 
   const selectedImages = computed(() => new Set(selectedImageMap.value.keys()))
   const selectedCount = computed(() => selectedImageMap.value.size)
@@ -123,6 +128,9 @@ export const useAppStore = defineStore('app', () => {
     const newMap = new Map(selectedImageMap.value)
     if (newMap.has(image.path)) {
       newMap.delete(image.path)
+      // 取消选中时移除所有分组
+      groupMap.value.delete(image.path)
+      groupMap.value = new Map(groupMap.value)
     } else {
       newMap.set(image.path, image)
     }
@@ -174,13 +182,133 @@ export const useAppStore = defineStore('app', () => {
     return image.rawPath || image.path
   }
 
-  async function exportImages(targetDir: string) {
+  // ── 分组操作 ──
+  const GROUP_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e']
+
+  function createGroup(name: string, shortcut: string): ImageGroup {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+    const color = GROUP_COLORS[groups.value.length % GROUP_COLORS.length]
+    const group: ImageGroup = { id, name, shortcut, color }
+    groups.value = [...groups.value, group]
+    saveGroups()
+    return group
+  }
+
+  function deleteGroup(id: string) {
+    groups.value = groups.value.filter(g => g.id !== id)
+    // 移除该分组的所有图片映射
+    for (const [path, gid] of groupMap.value.entries()) {
+      if (gid === id) groupMap.value.delete(path)
+    }
+    groupMap.value = new Map(groupMap.value)
+    saveGroups()
+  }
+
+  function renameGroup(id: string, name: string) {
+    groups.value = groups.value.map(g => g.id === id ? { ...g, name } : g)
+    saveGroups()
+  }
+
+  function setGroupShortcut(id: string, shortcut: string) {
+    groups.value = groups.value.map(g => g.id === id ? { ...g, shortcut } : g)
+    saveGroups()
+  }
+
+  function addToGroup(imagePath: string, groupId: string) {
+    const existing = groupMap.value.get(imagePath) || []
+    if (!existing.includes(groupId)) {
+      groupMap.value.set(imagePath, [...existing, groupId])
+      groupMap.value = new Map(groupMap.value)
+    }
+    // 自动选中
+    if (!selectedImageMap.value.has(imagePath)) {
+      const img = images.value.find(i => i.path === imagePath)
+      if (img) toggleImageSelection(img)
+    }
+    saveGroups()
+  }
+
+  function removeFromGroup(imagePath: string, groupId?: string) {
+    if (groupId) {
+      const existing = groupMap.value.get(imagePath) || []
+      const updated = existing.filter(id => id !== groupId)
+      if (updated.length === 0) {
+        groupMap.value.delete(imagePath)
+      } else {
+        groupMap.value.set(imagePath, updated)
+      }
+    } else {
+      groupMap.value.delete(imagePath)
+    }
+    groupMap.value = new Map(groupMap.value)
+    saveGroups()
+  }
+
+  function getGroupForImage(path: string): ImageGroup | null {
+    const gids = groupMap.value.get(path)
+    if (!gids || gids.length === 0) return null
+    return groups.value.find(g => g.id === gids[0]) || null
+  }
+
+  function getGroupsForImage(path: string): ImageGroup[] {
+    const gids = groupMap.value.get(path) || []
+    return groups.value.filter(g => gids.includes(g.id))
+  }
+
+  function isGroupShortcut(key: string): boolean {
+    return groups.value.some(g => g.shortcut === key)
+  }
+
+  function handleGroupShortcut(shortcut: string, imagePath: string) {
+    const group = groups.value.find(g => g.shortcut === shortcut)
+    if (!group) return
+    const currentGroup = groupMap.value.get(imagePath)
+    if (currentGroup === group.id) {
+      removeFromGroup(imagePath)
+    } else {
+      addToGroup(imagePath, group.id)
+    }
+  }
+
+  // ── 持久化 ──
+  const GROUPS_KEY = 'image-filter-groups'
+
+  function saveGroups() {
+    const data = {
+      groups: groups.value,
+      mappings: Array.from(groupMap.value.entries())
+    }
+    localStorage.setItem(GROUPS_KEY, JSON.stringify(data))
+  }
+
+  function loadGroups() {
+    try {
+      const raw = localStorage.getItem(GROUPS_KEY)
+      if (!raw) return
+      const data = JSON.parse(raw)
+      groups.value = data.groups || []
+      groupMap.value = new Map(data.mappings || [])
+    } catch (e) {
+      console.error('[Groups] Failed to load:', e)
+    }
+  }
+
+  function getExportPath(image: ImageInfo): string {
+    return image.rawPath || image.path
+  }
+
+  async function exportImages(targetDir: string, format: ExportFormat = 'both', images?: ImageInfo[]) {
     try {
       const sources: string[] = []
-      for (const img of selectedImageMap.value.values()) {
-        sources.push(img.path)
-        if (img.rawPath) {
-          sources.push(img.rawPath)
+      const toExport = images || Array.from(selectedImageMap.value.values())
+      for (const img of toExport) {
+        if (format === 'both' || format === 'regular') {
+          sources.push(img.path)
+        }
+        if (format === 'both' || format === 'raw') {
+          if (img.rawPath) {
+            sources.push(img.rawPath)
+          }
         }
       }
       const progress = await invoke<any>('export_images', { sources, targetDir: targetDir })
@@ -403,6 +531,22 @@ export const useAppStore = defineStore('app', () => {
     updateWasteConfig,
     scrollTarget,
     setScrollTarget,
+    // 分组
+    groups,
+    groupMap,
+    exportFormat,
+    createGroup,
+    deleteGroup,
+    renameGroup,
+    setGroupShortcut,
+    addToGroup,
+    removeFromGroup,
+    getGroupForImage,
+    getGroupsForImage,
+    isGroupShortcut,
+    handleGroupShortcut,
+    loadGroups,
+    saveGroups,
     // Toast
     toastMessage,
     toastType,

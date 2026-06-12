@@ -11,7 +11,7 @@
   >
     <div class="export-dialog">
       <div class="export-info">
-        <p>将导出 <strong>{{ store.selectedCount }}</strong> 张图片</p>
+        <p>将导出 <strong>{{ exportCount }}</strong> 张图片</p>
       </div>
 
       <div class="target-path">
@@ -27,6 +27,24 @@
         </div>
       </div>
 
+      <div class="export-format">
+        <label>导出格式:</label>
+        <div class="format-options">
+          <label class="format-option" :class="{ active: store.exportFormat === 'both' }">
+            <input type="radio" v-model="store.exportFormat" value="both" />
+            <span>RAW + 普通图片</span>
+          </label>
+          <label class="format-option" :class="{ active: store.exportFormat === 'raw' }">
+            <input type="radio" v-model="store.exportFormat" value="raw" />
+            <span>仅 RAW</span>
+          </label>
+          <label class="format-option" :class="{ active: store.exportFormat === 'regular' }">
+            <input type="radio" v-model="store.exportFormat" value="regular" />
+            <span>仅普通图片</span>
+          </label>
+        </div>
+      </div>
+
       <div v-if="exporting" class="export-progress">
         <n-progress
           type="line"
@@ -34,7 +52,7 @@
           :status="progressStatus"
         />
         <p class="progress-text">
-          已导出 {{ completedCount }} / {{ store.selectedCount }}
+          已导出 {{ completedCount }} / {{ exportCount }}
         </p>
       </div>
 
@@ -49,10 +67,12 @@
 import { ref, computed } from 'vue'
 import { NModal, NProgress } from 'naive-ui'
 import { useAppStore } from '../stores/app'
+import type { ImageInfo } from '../types'
 import { open } from '@tauri-apps/plugin-dialog'
 
 const props = defineProps<{
   show: boolean
+  images?: ImageInfo[]
 }>()
 
 const emit = defineEmits<{
@@ -61,6 +81,9 @@ const emit = defineEmits<{
 }>()
 
 const store = useAppStore()
+
+const exportImages = computed(() => props.images || store.allSelectedImages)
+const exportCount = computed(() => exportImages.value.length)
 
 const showDialog = computed({
   get: () => props.show,
@@ -73,8 +96,8 @@ const completedCount = ref(0)
 const exportError = ref('')
 
 const progress = computed(() => {
-  if (store.selectedCount === 0) return 0
-  return Math.round((completedCount.value / store.selectedCount) * 100)
+  if (exportCount.value === 0) return 0
+  return Math.round((completedCount.value / exportCount.value) * 100)
 })
 
 const progressStatus = computed(() => {
@@ -106,7 +129,7 @@ async function handleExport() {
     exportError.value = ''
     completedCount.value = 0
 
-    const result = await store.exportImages(targetPath.value)
+    const result = await store.exportImages(targetPath.value, store.exportFormat, exportImages.value)
 
     completedCount.value = result.completed
 
@@ -201,6 +224,51 @@ function reset() {
 .path-input button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.export-format {
+  margin-top: 12px;
+}
+
+.export-format label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.format-options {
+  display: flex;
+  gap: 8px;
+}
+
+.format-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
+}
+
+.format-option:hover {
+  border-color: var(--border-default);
+}
+
+.format-option.active {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+.format-option input[type="radio"] {
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .export-progress {

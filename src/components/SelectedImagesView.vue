@@ -6,6 +6,10 @@
         <span class="count">{{ store.selectedCount }} 张</span>
       </div>
       <div class="header-actions">
+        <select v-if="store.groups.length > 0" v-model="filterGroupId" class="group-filter">
+          <option value="">全部</option>
+          <option v-for="g in store.groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+        </select>
         <button 
           class="btn-export" 
           @click="showExportDialog = true" 
@@ -34,6 +38,10 @@
         <div class="card-image">
           <img :src="getImageUrl(image.path)" :alt="image.name" loading="lazy" />
           <span v-if="image.rawPath" class="raw-badge">RAW</span>
+          <span v-if="store.getGroupForImage(image.path)" class="group-tag"
+                :style="{ background: store.getGroupForImage(image.path)!.color }">
+            {{ store.getGroupForImage(image.path)!.name }}
+          </span>
           <button class="remove-btn" @click.stop="toggleSelection(image)" title="移除选中">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
@@ -45,7 +53,7 @@
       </div>
     </div>
 
-    <ExportDialog v-model:show="showExportDialog" @exported="onExported" />
+    <ExportDialog v-model:show="showExportDialog" :images="filteredImages" @exported="onExported" />
   </div>
 </template>
 
@@ -64,11 +72,20 @@ const props = defineProps<{
 
 const store = useAppStore()
 const showExportDialog = ref(false)
+const filterGroupId = ref('')
 
 const RAW_EXTENSIONS = ['cr2', 'cr3', 'nef', 'arw', 'dng', 'orf', 'rw2', 'pef', 'srw', 'raf']
 
 const filteredImages = computed(() => {
   let images = store.allSelectedImages
+
+  // 分组筛选
+  if (filterGroupId.value) {
+    images = images.filter(img => {
+      const group = store.getGroupForImage(img.path)
+      return group && group.id === filterGroupId.value
+    })
+  }
 
   if (props.fileTypeFilter === 'raw') {
     images = images.filter(img => RAW_EXTENSIONS.includes(img.extension.toLowerCase()))
@@ -143,6 +160,7 @@ function onExported() {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  min-height: 0;
 }
 
 .view-header {
@@ -153,6 +171,7 @@ function onExported() {
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  gap: 8px;
 }
 
 .header-info {
@@ -177,6 +196,29 @@ function onExported() {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.group-filter {
+  padding: 4px 8px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.group-tag {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #fff;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .btn-export {
@@ -226,6 +268,9 @@ function onExported() {
   gap: 8px;
   padding: 12px;
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
 }
 
 .image-card {

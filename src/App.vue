@@ -82,6 +82,23 @@
         <div class="toolbar-divider"></div>
 
         <button 
+          class="btn btn-ghost"
+          @click="openNewGroupDialog()"
+          title="新建分组"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>分组</span>
+        </button>
+        <button 
+          v-if="store.groups.length > 0"
+          class="btn btn-ghost"
+          @click="showGroupManager = true"
+          title="管理分组"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+
+        <button 
           class="btn btn-ghost" 
           @click="checkUpdate" 
           :disabled="checkingUpdate"
@@ -128,6 +145,7 @@
             :filter-text="filterText"
             :file-type-filter="fileTypeFilter"
             :custom-extensions="customExtensions"
+            @new-group="openNewGroupDialog"
           />
         </div>
         <SelectedImagesView 
@@ -145,6 +163,11 @@
       @switch-to-selected="switchToSelected"
     />
     <StatusBar />
+    <GroupDialog 
+      v-model:show="showGroupDialog"
+      @confirm="handleGroupConfirm"
+    />
+    <GroupManager v-model:show="showGroupManager" />
     <!-- Global Toast -->
     <Transition name="global-toast">
       <div v-if="toastMessage" class="global-toast" :class="toastType">{{ toastMessage }}</div>
@@ -163,6 +186,8 @@ import ImageGrid from './components/ImageGrid.vue'
 import SelectedImagesView from './components/SelectedImagesView.vue'
 import ImagePreview from './components/ImagePreview.vue'
 import StatusBar from './components/StatusBar.vue'
+import GroupDialog from './components/GroupDialog.vue'
+import GroupManager from './components/GroupManager.vue'
 import { open } from '@tauri-apps/plugin-dialog'
 
 const store = useAppStore()
@@ -172,6 +197,7 @@ const customExtensions = ref('')
 const currentView = ref<'directory' | 'selected'>('directory')
 
 store.autoLoadWasteModel()
+store.loadGroups()
 
 const toastMessage = computed(() => store.toastMessage)
 const toastType = computed(() => store.toastType)
@@ -189,6 +215,24 @@ const currentPreviewList = computed(() => {
   }
   return store.images
 })
+
+// 分组弹窗
+const showGroupDialog = ref(false)
+const showGroupManager = ref(false)
+const groupDialogImage = ref<string | null>(null)
+
+function openNewGroupDialog(imagePath?: string) {
+  groupDialogImage.value = imagePath || null
+  showGroupDialog.value = true
+}
+
+function handleGroupConfirm(name: string, shortcut: string) {
+  const group = store.createGroup(name, shortcut)
+  if (groupDialogImage.value) {
+    store.addToGroup(groupDialogImage.value, group.id)
+  }
+  showToast(`分组「${name}」已创建`)
+}
 
 async function selectDirectory() {
   try {
