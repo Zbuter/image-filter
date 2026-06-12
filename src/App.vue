@@ -96,17 +96,11 @@
     <div class="main-content">
       <aside class="sidebar">
         <DirectoryTree v-if="sidebarMode === 'directory'" />
-        <AiPanel 
-          v-else 
-          @load-model="loadModel"
-          @preview="previewFromAi"
-          @start-analysis="runAiAnalysis"
-          @hover-waste="handleHoverWaste"
-          @waste-context-menu="handleWasteContextMenu"
-          @detect-duplicates="runDedupDetection"
-          @mark-all-duplicates="markAllDuplicates"
-          @mark-group-duplicates="markGroupDuplicates"
-          @ignore-group="ignoreGroup"
+      <AiPanel 
+        v-else 
+         @preview="previewFromAi"
+         @hover-waste="handleHoverWaste"
+         @waste-context-menu="handleWasteContextMenu"
         />
       </aside>
 
@@ -118,7 +112,7 @@
           :style="{ left: wasteCtxMenu.x + 'px', top: wasteCtxMenu.y + 'px' }"
           @click.stop
         >
-          <button class="ctx-item" @click="markWasteAsGood">
+         <button class="ctx-item" @click="markWasteAsGood">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
             标记为非废片
           </button>
@@ -129,6 +123,7 @@
         <div v-if="currentView === 'directory'" class="content-inner">
           <Breadcrumb />
           <ImageGrid 
+            ref="imageGridRef"
             :highlighted-waste-path="highlightedWastePath"
             :filter-text="filterText"
             :file-type-filter="fileTypeFilter"
@@ -150,6 +145,10 @@
       @switch-to-selected="switchToSelected"
     />
     <StatusBar />
+    <!-- Global Toast -->
+    <Transition name="global-toast">
+      <div v-if="toastMessage" class="global-toast" :class="toastType">{{ toastMessage }}</div>
+    </Transition>
   </div>
 </template>
 
@@ -171,33 +170,15 @@ const filterText = ref('')
 const fileTypeFilter = ref<'all' | 'raw' | 'regular' | 'custom'>('all')
 const customExtensions = ref('')
 const currentView = ref<'directory' | 'selected'>('directory')
-// Hide waste context menu on click
-  document.addEventListener('click', hideWasteCtxMenu)
 
-  // Auto-load AI model and feedback on startup
-    ;(async () => {
-      try {
-        // Try saved model path first
-        const savedPath = await invoke<string | null>('load_model_path')
-        if (savedPath) {
-          await store.initAiModel(savedPath)
-          console.log('[AI] Auto-loaded model from saved path:', savedPath)
-        } else {
-          // Fallback: check default ai-models dir
-          const exists = await invoke<boolean>('check_ai_model_exists')
-          if (exists) {
-            const modelDir = await invoke<string>('get_ai_model_dir')
-            await store.initAiModel(modelDir)
-            console.log('[AI] Auto-loaded model from default dir')
-          }
-        }
-      } catch (e) {
-        console.log('[AI] No model found, will load manually later')
-      }
-      await store.hydrateFeedback()
-  })()
+store.autoLoadWasteModel()
+
+const toastMessage = computed(() => store.toastMessage)
+const toastType = computed(() => store.toastType)
+const showToast = store.showToast
 
 const sidebarMode = ref<'directory' | 'ai'>('directory')
+const imageGridRef = ref<any>(null)
 const aiModelDir = ref('')
 const checkingUpdate = ref(false)
 const updateMessage = ref('')
@@ -270,50 +251,15 @@ async function toggleAiPanel() {
     }
   }
 
-  async function loadModel() {
-    console.log('[AI] loadModel called, aiModelLoaded:', store.aiModelLoaded);
-    try {
-      // First check if model already exists
-      const exists = await invoke<boolean>('check_ai_model_exists');
-      if (exists && !store.aiModelLoaded) {
-        const modelDir = await invoke<string>('get_ai_model_dir');
-        await store.initAiModel(modelDir);
-        if (store.images.length > 0 && store.aiResults.length === 0) {
-          await runAiAnalysis();
-        }
-        return;
-      }
-      // Open file picker for zip
-      const { open } = await import('@tauri-apps/plugin-dialog');
-      const selected = await open({ directory: false, multiple: false, title: '选择 AI 模型压缩包', filters: [{ name: 'ZIP', extensions: ['zip'] }] });
-      if (selected) {
-        console.log('[AI] Extracting model from:', selected);
-        const modelDir = await invoke<string>('extract_ai_model_zip', { zipPath: selected });
-        await store.initAiModel(modelDir);
-        await invoke('save_model_path', { modelDir });
-        console.log('[AI] initAiModel completed, aiModelLoaded:', store.aiModelLoaded);
-        if (store.images.length > 0) {
-          await runAiAnalysis();
-        } else {
-          alert('AI 模型加载成功，但当前没有图片可分析。请先打开一个包含图片的目录。');
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load AI model:', e);
-      alert('AI 模型加载失败: ' + String(e));
-    }
-  }
-
-async function runAiAnalysis() {
-  const paths = store.images.map(img => img.path);
-  if (paths.length === 0) return;
-  await store.startAiAnalysis(paths);
-}
 
 function previewFromAi(path: string) {
   const img = store.images.find(i => i.path === path);
   if (img) {
     store.setPreviewImage(img);
+    // 滚动到网格中的对应图片
+    if (imageGridRef.value) {
+      imageGridRef.value.scrollToPath(path)
+    }
   }
 }
 
@@ -334,9 +280,7 @@ function previewFromAi(path: string) {
     wasteCtxMenu.value.visible = false
     if (!path) return
     try {
-      await store.markImageFeedback(path, false)
-      // Re-analyze to update results
-      await runAiAnalysis()
+      await store.markWasteAsGood(path)
     } catch (e) {
       console.error('Failed to mark:', e)
     }
@@ -346,48 +290,6 @@ function previewFromAi(path: string) {
     wasteCtxMenu.value.visible = false
   }
 
-
-  async function runDedupDetection() {
-    const paths = store.images.map(img => img.path)
-    if (paths.length === 0) return
-    try {
-      await store.detectDuplicates(paths)
-    } catch (e) {
-      console.error('Dedup failed:', e)
-    }
-  }
-
-  async function markAllDuplicates() {
-    const allDupPaths: string[] = []
-    for (const group of store.duplicateGroups) {
-      for (const dup of group.duplicates) {
-        allDupPaths.push(dup.path)
-      }
-    }
-    if (allDupPaths.length === 0) return
-    try {
-      await store.markDuplicatesAsWaste(allDupPaths)
-      store.duplicateGroups = []
-      // Re-analyze to update waste list
-      await runAiAnalysis()
-    } catch (e) {
-      console.error('Failed to mark duplicates:', e)
-    }
-  }
-
-
-  async function markGroupDuplicates(group: any) {
-    const dupPaths = group.duplicates.map((d: any) => d.path)
-    if (dupPaths.length === 0) return
-    try {
-      await store.markDuplicatesAsWaste(dupPaths)
-      // Remove this group from display
-      store.duplicateGroups = store.duplicateGroups.filter(g => g.best_path !== group.best_path)
-      await runAiAnalysis()
-    } catch (e) {
-      console.error('Failed to mark group duplicates:', e)
-    }
-  }
 
   function ignoreGroup(index: number) {
     store.duplicateGroups.splice(index, 1)
@@ -411,10 +313,10 @@ async function checkUpdate() {
         await installUpdateFunc()
       }
     } else {
-      alert('当前已是最新版本')
+      showToast('当前已是最新版本')
     }
   } catch (e: unknown) {
-    alert('检查更新失败: ' + formatError(e))
+    showToast('检查更新失败: ' + formatError(e))
   } finally {
     checkingUpdate.value = false
   }
@@ -423,9 +325,9 @@ async function checkUpdate() {
 async function installUpdateFunc() {
   try {
     const result = await invoke<string>('install_update')
-    alert(result)
+    showToast(result)
   } catch (e: unknown) {
-    alert('安装更新失败: ' + formatError(e))
+    showToast('安装更新失败: ' + formatError(e))
   }
 }
 
@@ -801,4 +703,34 @@ onUnmounted(() => {
   color: var(--text-secondary);
 }
 
+/* Global Toast */
+.global-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  color: #fff;
+  z-index: 9999;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.global-toast.error {
+  background: var(--danger);
+}
+.global-toast.success {
+  background: var(--success);
+}
+
+.global-toast-enter-active, .global-toast-leave-active {
+  transition: all 0.3s ease;
+  opacity: 1;
+}
+
+.global-toast-enter-from, .global-toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(10px);
+}
 </style>

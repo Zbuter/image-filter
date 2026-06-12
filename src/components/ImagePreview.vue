@@ -335,6 +335,11 @@ function handleKeydown(e: KeyboardEvent) {
         e.preventDefault()
         markFeedback(false)
         break
+      case 'Delete':
+        e.preventDefault()
+        store.hideImage(store.previewImage.path)
+        nextImage()
+        break
       case 'r': case 'R':
       if (e.shiftKey) rotateRight()
       else rotateLeft()
@@ -359,7 +364,7 @@ function toggleSelectionAndAdvance() {
   async function markFeedback(isWaste: boolean) {
     if (!store.previewImage) return
     try {
-      const count = await store.markImageFeedback(store.previewImage.path, isWaste)
+      const count = await store.markWasteFeedback(store.previewImage.path, isWaste, [])
       feedbackToast.value = isWaste ? `已标记废片 (共 ${count} 条)` : `已标记非废片 (共 ${count} 条)`
       if (toastTimer) clearTimeout(toastTimer)
       toastTimer = setTimeout(() => { feedbackToast.value = '' }, 1500)

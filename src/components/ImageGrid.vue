@@ -10,6 +10,7 @@
     </div>
     <RecycleScroller
       v-else
+      ref="scrollerRef"
       class="scroller"
       :items="imageRows"
       :item-size="220"
@@ -21,7 +22,7 @@
             v-for="image in row.images" 
             :key="image.path"
             class="image-card"
-            :class="{ selected: store.isImageSelected(image.path), 'waste-highlight': props.highlightedWastePath === image.path, 'marked-waste': store.isMarkedWaste(image.path), 'marked-good': store.isMarkedNotWaste(image.path) }"
+            :class="{ selected: store.isImageSelected(image.path), 'waste-highlight': props.highlightedWastePath === image.path || store.scrollTarget === image.path, 'marked-waste': store.isMarkedWaste(image.path), 'marked-good': store.isMarkedNotWaste(image.path) }"
             @click="handleClick(image, $event)"
             @dblclick="handleDoubleClick(image)"
             @contextmenu.prevent="showContextMenu($event, image)"
@@ -65,6 +66,11 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
           标记为非废片
         </button>
+        <div class="ctx-divider"></div>
+        <button class="ctx-item ctx-item-danger" @click="deleteFromCtx()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          删除
+        </button>
       </div>
     </Teleport>
   </div>
@@ -86,9 +92,21 @@ const props = defineProps<{
 }>()
 
 const store = useAppStore()
+const scrollerRef = ref<any>(null)
 
+// 滚动到指定路径的图片
+function scrollToPath(path: string) {
+  const idx = filteredImages.value.findIndex(img => img.path === path)
+  if (idx === -1) return
+  const rowIndex = Math.floor(idx / COLS)
+  if (scrollerRef.value) {
+    scrollerRef.value.scrollToItem(rowIndex)
+  }
+  // 设置高亮
+  store.setScrollTarget(path)
+}
 
-
+defineExpose({ scrollToPath })
 
 const COLS = 5
 const imageRows = computed(() => {
@@ -115,9 +133,20 @@ async function markFromCtx(isWaste: boolean) {
   hideContextMenu()
   if (!img) return
   try {
-    await store.markImageFeedback(img.path, isWaste)
+    await store.markWasteFeedback(img.path, isWaste, [])
   } catch (e) {
     console.error('Failed to mark feedback:', e)
+  }
+}
+
+async function deleteFromCtx() {
+  const img = contextMenu.value.image
+  hideContextMenu()
+  if (!img) return
+  // 从 images 列表中移除（仅前端）
+  const idx = store.images.findIndex(i => i.path === img.path)
+  if (idx !== -1) {
+    store.images.splice(idx, 1)
   }
 }
 
@@ -413,6 +442,24 @@ watch(filteredImages, () => {
 
 .ctx-item:hover {
   background: var(--bg-hover);
+}
+
+.ctx-item-danger {
+  color: var(--danger);
+}
+
+.ctx-item-danger:hover {
+  background: rgba(212, 83, 83, 0.15);
+}
+
+.ctx-item-danger svg {
+  color: var(--danger);
+}
+
+.ctx-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 4px 0;
 }
 
 .ctx-item svg {
