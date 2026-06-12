@@ -192,38 +192,38 @@ pub fn analyze_image(
     let img = load_image_as_rgb(image_path)?;
 
     // 1. 图像质量 + 人脸分析
-    let features = wedding_analyzer::analyze_wedding_image(&img);
+    let (features, _scene) = wedding_analyzer::analyze_wedding_image(&img);
 
-    // 2. 计算废片分数（基于规则）
-    let (mut score, mut reasons) = wedding_analyzer::calculate_waste_score(&features, config);
+    // 2. 计算皮肤区域曝光比例（婚礼人像专用）
+    let skin_exposure = quality_analyzer::calculate_skin_exposure(&img);
 
-    // 3. 截图/图标检测
+    // 3. 计算废片分数（基于规则）
+    let (mut score, mut reasons) = wedding_analyzer::calculate_waste_score(&features, config, skin_exposure);
+
+    // 4. 截图/图标检测
     if is_screenshot(&img, &features) {
         score = (score + 0.4).min(1.0);
         reasons.push(WasteReason::Screenshot);
     }
 
-    // 4. 使用训练好的分类器调整分数
+    // 5. 使用训练好的分类器调整分数
     if let Some(clf) = classifier {
         let feature_vec = features.to_vec();
         if feature_vec.len() == clf.feature_dim {
             let clf_prob = clf.predict(&feature_vec);
-            // 分类器占 70% 权重，规则占 30%
-            // 用户标记的学习结果应该有决定性影响
             let alpha = 0.7;
             score = (score * (1.0 - alpha) + clf_prob * alpha).min(1.0);
 
-            // 如果分类器判定为废片但规则未触发，添加原因
             if clf_prob > 0.6 && reasons.is_empty() {
                 reasons.push(WasteReason::LowRetouchValue);
             }
         }
     }
 
-    // 5. 计算质量分数
+    // 6. 计算质量分数
     let quality_score = quality_analyzer::calculate_quality_score(&features.quality_features);
 
-    // 6. 判断是否废片
+    // 7. 判断是否废片
     let is_waste = score > 0.5;
     let confidence = if is_waste {
         (score - 0.5) * 2.0
@@ -363,7 +363,7 @@ pub async fn mark_waste_feedback(
 ) -> Result<u32, String> {
     let features = {
         let img = load_image_as_rgb(Path::new(&path))?;
-        let features = wedding_analyzer::analyze_wedding_image(&img);
+        let (features, _scene) = wedding_analyzer::analyze_wedding_image(&img);
         features.to_vec()
     };
 

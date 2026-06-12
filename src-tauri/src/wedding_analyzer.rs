@@ -15,19 +15,7 @@ pub enum SceneType {
     Unknown,
 }
 
-impl SceneType {
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "registration" => SceneType::Registration,
-            "ceremony" => SceneType::Ceremony,
-            "portrait" => SceneType::Portrait,
-            "group" => SceneType::Group,
-            "outdoor" => SceneType::Outdoor,
-            "reception" => SceneType::Reception,
-            _ => SceneType::Unknown,
-        }
-    }
-}
+impl SceneType {}
 
 /// 废片原因
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -96,7 +84,6 @@ pub struct WasteConfig {
     pub min_face_ratio: f32,
     pub max_face_ratio: f32,
     pub noise_threshold: f32,
-    pub duplicate_similarity: f32,
 }
 
 impl Default for WasteConfig {
@@ -112,7 +99,6 @@ impl Default for WasteConfig {
             min_face_ratio: 0.05,
             max_face_ratio: 0.8,
             noise_threshold: 0.3,
-            duplicate_similarity: 0.97,
         }
     }
 }
@@ -379,20 +365,30 @@ fn calculate_face_blur(img: &RgbImage, det: &FaceDetection, img_w: u32, img_h: u
 }
 
 /// 综合分析图像（质量 + 人脸）
-pub fn analyze_wedding_image(img: &RgbImage) -> WeddingFeatures {
+pub fn analyze_wedding_image(img: &RgbImage) -> (WeddingFeatures, SceneType) {
     let quality_features = quality_analyzer::extract_quality_features(img);
     let face_features = analyze_face_features(img);
 
-    WeddingFeatures {
+    // 根据人脸数量推断场景类型
+    let scene = if face_features.face_count > 0.8 {
+        SceneType::Group      // 多人 → 合照
+    } else if face_features.face_count > 0.0 && face_features.face_size_ratio > 0.15 {
+        SceneType::Portrait   // 单人且人脸较大 → 肖像
+    } else {
+        SceneType::Unknown    // 无人脸或人脸太小
+    };
+
+    (WeddingFeatures {
         quality_features,
         face_features,
-    }
+    }, scene)
 }
 
 /// 计算废片概率和原因
 pub fn calculate_waste_score(
     features: &WeddingFeatures,
     config: &WasteConfig,
+    skin_exposure: f32,
 ) -> (f32, Vec<WasteReason>) {
     let mut score = 0.0f32;
     let mut reasons = Vec::new();
@@ -401,6 +397,11 @@ pub fn calculate_waste_score(
     if features.quality_features.overexposed_ratio > config.overexposed_threshold {
         score += 0.20;
         reasons.push(WasteReason::Overexposed);
+    }
+    // 皮肤过曝（婚礼人像专用，权重更高）
+    if skin_exposure > config.skin_overexposed_threshold {
+        score += 0.25;
+        reasons.push(WasteReason::SkinOverexposed);
     }
     if features.quality_features.underexposed_ratio > config.underexposed_threshold {
         score += 0.15;
@@ -474,9 +475,6 @@ pub fn calculate_waste_score(
             reasons.push(WasteReason::SubjectTooLarge);
         }
     }
-
-    // 无人脸场景（侧面照、背面照）- 不降低质量分，但标记为无人脸
-    // 这类照片可能有精修价值，只是无法分析表情
 
     // 噪点 (权重 5%)
     if features.quality_features.noise_level > config.noise_threshold {

@@ -291,10 +291,6 @@ function previewFromAi(path: string) {
   }
 
 
-  function ignoreGroup(index: number) {
-    store.duplicateGroups.splice(index, 1)
-  }
-
 async function checkUpdate() {
   try {
     checkingUpdate.value = true

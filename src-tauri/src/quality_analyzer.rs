@@ -524,7 +524,6 @@ pub fn calculate_skin_exposure(img: &RgbImage) -> f32 {
         let g = p[1] as f32;
         let b = p[2] as f32;
 
-        // 简单的皮肤检测 (RGB 色彩空间)
         let is_skin = r > 95.0 && g > 40.0 && b > 20.0
             && r > g && r > b
             && (r - g).abs() > 15.0

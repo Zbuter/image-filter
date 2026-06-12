@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::sync::Mutex;
 use image::RgbImage;
 use ort::session::Session;
@@ -31,18 +30,6 @@ pub struct FaceExpression {
     pub is_smiling: bool,       // 是否微笑
     pub is_frowning: bool,      // 是否皱眉
     pub is_surprised: bool,     // 是否惊讶（嘴巴大张）
-}
-
-pub fn load_yunet_model(model_path: &Path) -> Result<(), String> {
-    let session = Session::builder()
-        .map_err(|e| format!("Failed to create ONNX session builder: {}", e))?
-        .commit_from_file(model_path)
-        .map_err(|e| format!("Failed to load YuNet model: {}", e))?;
-    
-    let mut guard = YUNET_SESSION.lock().map_err(|e| e.to_string())?;
-    *guard = Some(session);
-    
-    Ok(())
 }
 
 pub fn detect_faces(img: &RgbImage) -> Result<Vec<FaceDetection>, String> {
@@ -211,29 +198,4 @@ pub fn analyze_expression(det: &FaceDetection) -> FaceExpression {
         is_frowning,
         is_surprised,
     }
-}
-
-/// 批量分析多人脸表情
-pub fn analyze_expressions(detections: &[FaceDetection]) -> Vec<FaceExpression> {
-    detections.iter().map(analyze_expression).collect()
-}
-
-/// 检测是否为表情包/怪表情
-pub fn is_funny_expression(expr: &FaceExpression) -> bool {
-    // 嘴巴过度张开
-    if expr.mouth_openness > 0.5 {
-        return true;
-    }
-
-    // 完全闭眼
-    if expr.eye_closed_ratio > 0.8 {
-        return true;
-    }
-
-    // 表情质量过低
-    if expr.expression_quality < 0.2 {
-        return true;
-    }
-
-    false
 }

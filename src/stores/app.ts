@@ -337,30 +337,6 @@ export const useAppStore = defineStore('app', () => {
     return markedStatus.value.has(path)
   }
 
-  // ── 重复检测 ──
-  const duplicateGroups = ref<DuplicateGroup[]>([])
-  const dedupDetecting = ref(false)
-
-  async function detectDuplicates(paths: string[]) {
-    dedupDetecting.value = true
-    try {
-      const groups = await invoke<DuplicateGroup[]>('detect_duplicates', { paths })
-      duplicateGroups.value = groups
-      return groups
-    } catch (e) {
-      console.error('Duplicate detection failed:', e)
-      throw e
-    } finally {
-      dedupDetecting.value = false
-    }
-  }
-
-  async function runDedupDetection() {
-    const paths = images.value.map(img => img.path)
-    if (paths.length === 0) return
-    await detectDuplicates(paths)
-  }
-
   // Toast
   const toastMessage = ref('')
   const toastType = ref<'success' | 'error'>('success')
@@ -427,11 +403,6 @@ export const useAppStore = defineStore('app', () => {
     updateWasteConfig,
     scrollTarget,
     setScrollTarget,
-    // 重复检测
-    duplicateGroups,
-    dedupDetecting,
-    detectDuplicates,
-    runDedupDetection,
     // Toast
     toastMessage,
     toastType,

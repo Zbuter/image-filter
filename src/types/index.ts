@@ -34,18 +34,6 @@ export interface ExportProgress {
   failed: string[]
 }
 
-export interface DuplicateEntry {
-  path: string
-  score: number
-  similarity: number
-}
-
-export interface DuplicateGroup {
-  best_path: string
-  best_score: number
-  duplicates: DuplicateEntry[]
-}
-
 // 废片检测结果
 export interface WasteResult {
   path: string
@@ -120,7 +108,6 @@ export interface WasteConfig {
   min_face_ratio: number
   max_face_ratio: number
   noise_threshold: number
-  duplicate_similarity: number
 }
 
 // 废片原因枚举
