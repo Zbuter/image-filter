@@ -36,3 +36,4 @@ package-lock.json
 .codegraph/
 models/
 .mimocode/
+pnpm-lock.yaml
