@@ -1,9 +1,0 @@
-{
-  "bundle": {
-    "macOS": {
-      "files": {
-        "Frameworks/libonnxruntime.dylib": "onnxruntime/osx-universal2/libonnxruntime.dylib"
-      }
-    }
-  }
-}

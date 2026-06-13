@@ -40,6 +40,10 @@
       "icons/icon.ico"
     ],
     "macOS": {
+      "frameworks": [
+        "onnxruntime/osx-universal2/libonnxruntime.dylib",
+        "onnxruntime/osx-universal2/libonnxruntime.1.21.0.dylib"
+      ],
       "minimumSystemVersion": "10.13",
       "dmg": {}
     },
