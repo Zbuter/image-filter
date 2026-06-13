@@ -49,10 +49,7 @@
       "digestAlgorithm": "sha256",
       "timestampUrl": "",
       "nsis": {
-        "installerIcon": "icons/icon.ico",
-        "files": {
-          "../onnxruntime/win-x64/onnxruntime.dll": "onnxruntime.dll"
-        }
+        "installerIcon": "icons/icon.ico"
       }
     },
     "createUpdaterArtifacts": true
