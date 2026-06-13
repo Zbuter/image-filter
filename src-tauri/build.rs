@@ -33,6 +33,7 @@ fn main() {
             let _ = fs::copy(&dylib_src, &dylib_unversioned);
             println!("cargo:rustc-link-search=native={}", bin_dir.display());
             println!("cargo:rustc-link-arg=-Wl,-rpath,@loader_path");
+            println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks");
         }
         "windows" => {
             let dll_src = format!("{}/onnxruntime.dll", lib_dir);
