@@ -1,6 +1,6 @@
 [package]
 name = "image-filter"
-version = "1.0.2"
+version = "1.0.3"
 description = "A Tauri app for filtering and selecting images"
 authors = ["you"]
 edition = "2021"

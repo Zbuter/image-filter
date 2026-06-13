@@ -17,7 +17,7 @@ npm run dev      # Vite dev server on port 1420
 
 ### Full App (Frontend + Rust)
 ```bash
-npx tauri dev    # Starts Vite + Rust dev server
+npm run tauri dev    # Starts Vite + Rust dev server
 ```
 
 ### Build
@@ -91,8 +91,11 @@ Registered in `main.rs`, invoked via `invoke('command_name', args)`:
 ### Local Build Requirements
 - Node.js (LTS)
 - Rust stable
-- ONNX Runtime libs (set `ORT_LIB_LOCATION`)
 - macOS: `brew install libpng`
+
+### ORT 环境变量
+- `ORT_LIB_LOCATION` → 指向平台对应的 ONNX Runtime 库路径（`build.rs` 自动设置）
+- `ORT_PREFER_DYNAMIC_LINK=1` → macOS 需要设置（`build.rs` 自动设置）
 
 ### Release Flow
 1. Update version in `package.json` AND `src-tauri/tauri.conf.json` AND `src-tauri/Cargo.toml`

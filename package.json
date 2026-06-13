@@ -1,13 +1,14 @@
 {
   "name": "image-filter",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "ORT_LIB_LOCATION=$(pwd)/src-tauri/onnxruntime/osx-universal2 ORT_PREFER_DYNAMIC_LINK=1 tauri",
+    "tauri:build": "ORT_LIB_LOCATION=$(pwd)/src-tauri/onnxruntime/osx-universal2 ORT_PREFER_DYNAMIC_LINK=1 tauri build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
