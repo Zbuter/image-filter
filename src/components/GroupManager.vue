@@ -7,33 +7,49 @@
           <button class="dialog-close" @click="$emit('update:show', false)">×</button>
         </div>
         <div class="dialog-body">
-          <div v-if="store.groups.length === 0" class="empty-hint">暂无分组</div>
-          <div v-for="g in store.groups" :key="g.id" class="group-item">
-            <span class="group-dot" :style="{ background: g.color }"></span>
-            <template v-if="editingId === g.id">
-              <input v-model="editingName" class="edit-input" @keydown.enter="saveEdit(g.id)" @blur="saveEdit(g.id)" autofocus />
-              <input
-                v-model="editingShortcut"
-                class="edit-input shortcut"
-                readonly
-                placeholder="按一个键"
-                @focus="listeningShortcut = true"
-                @blur="listeningShortcut = false"
-                @keydown.prevent="captureShortcut"
-              />
-            </template>
-            <template v-else>
-              <span class="group-name">{{ g.name }}</span>
-              <span class="group-shortcut">{{ g.shortcut }}</span>
-            </template>
-            <div class="group-actions">
-              <button v-if="editingId !== g.id" class="icon-btn" @click="startEdit(g)" title="编辑">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              </button>
-              <button class="icon-btn danger" @click="store.deleteGroup(g.id)" title="删除">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              </button>
+          <div class="group-list">
+            <div v-if="store.groups.length === 0" class="empty-hint">暂无分组</div>
+            <div v-for="g in store.groups" :key="g.id" class="group-item">
+              <span class="group-dot" :style="{ background: g.color }"></span>
+              <template v-if="editingId === g.id">
+                <input v-model="editingName" class="edit-input" maxlength="5" @keydown.enter="saveEdit(g.id)" autofocus />
+                <input
+                  v-model="editingShortcut"
+                  class="edit-input shortcut"
+                  readonly
+                  placeholder="按一个键"
+                  @focus="listeningShortcut = true"
+                  @blur="listeningShortcut = false"
+                  @keydown.prevent="captureShortcut"
+                />
+                <div class="group-actions">
+                  <button class="icon-btn confirm" @click="saveEdit(g.id)" title="确认">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                  </button>
+                  <button class="icon-btn" @click="cancelEdit" title="取消">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </template>
+              <template v-else>
+                <span class="group-name">{{ g.name }}</span>
+                <span class="group-shortcut">{{ g.shortcut }}</span>
+                <div class="group-actions">
+                  <button class="icon-btn" @click="startEdit(g)" title="编辑">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
+                  <button class="icon-btn danger" @click="store.deleteGroup(g.id)" title="删除">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  </button>
+                </div>
+              </template>
             </div>
+          </div>
+          <div class="dialog-footer">
+            <button class="btn-add" @click="$emit('new-group')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              新建分组
+            </button>
           </div>
         </div>
       </div>
@@ -46,7 +62,7 @@ import { ref } from 'vue'
 import { useAppStore } from '../stores/app'
 
 const props = defineProps<{ show: boolean }>()
-defineEmits<{ 'update:show': [val: boolean] }>()
+defineEmits<{ 'update:show': [val: boolean]; 'new-group': [] }>()
 
 const store = useAppStore()
 const editingId = ref<string | null>(null)
@@ -73,6 +89,10 @@ function saveEdit(id: string) {
   if (editingShortcut.value) {
     store.setGroupShortcut(id, editingShortcut.value)
   }
+  editingId.value = null
+}
+
+function cancelEdit() {
   editingId.value = null
 }
 </script>
@@ -143,4 +163,15 @@ function saveEdit(id: string) {
   outline: none;
 }
 .edit-input.shortcut { width: 40px; flex: none; text-align: center; font-weight: 600; }
+.icon-btn.confirm { color: var(--success); }
+.icon-btn.confirm:hover { background: rgba(92, 184, 122, 0.15); color: var(--success); }
+.group-list { max-height: 40vh; overflow-y: auto; }
+.dialog-footer { padding: 10px 16px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-start; }
+.btn-add {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 10px; background: transparent; border: 1px dashed var(--border-default);
+  border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 12px; cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.btn-add:hover { background: var(--bg-hover); border-color: var(--accent); color: var(--accent); }
 </style>

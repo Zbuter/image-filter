@@ -38,10 +38,11 @@
         <div class="card-image">
           <img :src="getImageUrl(image.path)" :alt="image.name" loading="lazy" />
           <span v-if="image.rawPath" class="raw-badge">RAW</span>
-          <span v-if="store.getGroupForImage(image.path)" class="group-tag"
-                :style="{ background: store.getGroupForImage(image.path)!.color }">
-            {{ store.getGroupForImage(image.path)!.name }}
-          </span>
+          <div v-if="store.getGroupsForImage(image.path).length > 0" class="group-tags"
+               :title="store.getGroupsForImage(image.path).map(g => g.name).join(', ')">
+            <span v-for="g in store.getGroupsForImage(image.path)" :key="g.id" class="group-dot"
+                  :style="{ background: g.color }"></span>
+          </div>
           <button class="remove-btn" @click.stop="toggleSelection(image)" title="移除选中">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
@@ -82,8 +83,8 @@ const filteredImages = computed(() => {
   // 分组筛选
   if (filterGroupId.value) {
     images = images.filter(img => {
-      const group = store.getGroupForImage(img.path)
-      return group && group.id === filterGroupId.value
+      const groups = store.getGroupsForImage(img.path)
+      return groups.some(g => g.id === filterGroupId.value)
     })
   }
 
@@ -158,9 +159,10 @@ function onExported() {
 .selected-view {
   display: flex;
   flex-direction: column;
-  height: 100%;
   overflow: hidden;
   min-height: 0;
+  position: relative;
+  flex: 1;
 }
 
 .view-header {
@@ -208,16 +210,21 @@ function onExported() {
   cursor: pointer;
 }
 
-.group-tag {
+.group-tags {
   position: absolute;
   bottom: 6px;
   left: 6px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 500;
-  color: #fff;
+  display: flex;
+  gap: 3px;
   z-index: 2;
+}
+
+.group-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.3);
   pointer-events: none;
 }
 
@@ -263,17 +270,19 @@ function onExported() {
 }
 
 .grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
-  align-content: start;
+  align-content: flex-start;
 }
 
 .image-card {
+  width: 140px;
+  flex-shrink: 0;
   position: relative;
   background: var(--bg-surface);
   border: 1px solid var(--accent-border);

@@ -62,7 +62,6 @@
         <span v-for="g in currentGroups" :key="g.id" class="preview-group-tag"
               :style="{ background: g.color }">
           {{ g.name }}
-          <span class="preview-group-shortcut">{{ g.shortcut }}</span>
         </span>
         <span v-if="store.previewImage.width && store.previewImage.height" class="file-dims">
           {{ store.previewImage.width }} × {{ store.previewImage.height }}
@@ -505,11 +504,6 @@ onUnmounted(() => {
   color: #fff;
 }
 
-.preview-group-shortcut {
-  font-size: 10px;
-  opacity: 0.7;
-  font-weight: 600;
-}
 
 .file-dims {
   color: var(--text-tertiary);

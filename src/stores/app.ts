@@ -148,6 +148,12 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  function hideSelectedImages() {
+    const paths = new Set(selectedImageMap.value.keys())
+    images.value = images.value.filter(img => !paths.has(img.path))
+    selectedImageMap.value = new Map()
+  }
+
   function isImageHidden(path: string): boolean {
     return false
   }
@@ -184,10 +190,13 @@ export const useAppStore = defineStore('app', () => {
 
   // ── 分组操作 ──
   const GROUP_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e']
+  const MAX_GROUPS = GROUP_COLORS.length
 
-  function createGroup(name: string, shortcut: string): ImageGroup {
+  function createGroup(name: string, shortcut: string): ImageGroup | null {
+    if (groups.value.length >= MAX_GROUPS) return null
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
-    const color = GROUP_COLORS[groups.value.length % GROUP_COLORS.length]
+    const usedColors = new Set(groups.value.map(g => g.color))
+    const color = GROUP_COLORS.find(c => !usedColors.has(c)) || GROUP_COLORS[groups.value.length % GROUP_COLORS.length]
     const group: ImageGroup = { id, name, shortcut, color }
     groups.value = [...groups.value, group]
     saveGroups()
@@ -275,8 +284,7 @@ export const useAppStore = defineStore('app', () => {
 
   function saveGroups() {
     const data = {
-      groups: groups.value,
-      mappings: Array.from(groupMap.value.entries())
+      groups: groups.value
     }
     localStorage.setItem(GROUPS_KEY, JSON.stringify(data))
   }
@@ -287,7 +295,7 @@ export const useAppStore = defineStore('app', () => {
       if (!raw) return
       const data = JSON.parse(raw)
       groups.value = data.groups || []
-      groupMap.value = new Map(data.mappings || [])
+      groupMap.value = new Map()
     } catch (e) {
       console.error('[Groups] Failed to load:', e)
     }
@@ -501,6 +509,7 @@ export const useAppStore = defineStore('app', () => {
     toggleImageSelection,
     isImageSelected,
     hideImage,
+    hideSelectedImages,
     selectAll,
     clearSelection,
     invertSelection,
@@ -534,6 +543,7 @@ export const useAppStore = defineStore('app', () => {
     // 分组
     groups,
     groupMap,
+    MAX_GROUPS,
     exportFormat,
     createGroup,
     deleteGroup,

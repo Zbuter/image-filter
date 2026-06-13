@@ -83,6 +83,7 @@
 
         <button 
           class="btn btn-ghost"
+          :disabled="store.groups.length >= store.MAX_GROUPS"
           @click="openNewGroupDialog()"
           title="新建分组"
         >
@@ -167,7 +168,7 @@
       v-model:show="showGroupDialog"
       @confirm="handleGroupConfirm"
     />
-    <GroupManager v-model:show="showGroupManager" />
+    <GroupManager v-model:show="showGroupManager" @new-group="openNewGroupDialog()" />
     <!-- Global Toast -->
     <Transition name="global-toast">
       <div v-if="toastMessage" class="global-toast" :class="toastType">{{ toastMessage }}</div>
@@ -228,6 +229,10 @@ function openNewGroupDialog(imagePath?: string) {
 
 function handleGroupConfirm(name: string, shortcut: string) {
   const group = store.createGroup(name, shortcut)
+  if (!group) {
+    showToast(`最多只能创建 ${store.MAX_GROUPS} 个分组`, 'error')
+    return
+  }
   if (groupDialogImage.value) {
     store.addToGroup(groupDialogImage.value, group.id)
   }
@@ -398,6 +403,11 @@ function handleKeydown(e: KeyboardEvent) {
       e.preventDefault()
       const input = document.querySelector('.search-input') as HTMLInputElement
       input?.focus()
+    }
+  } else if (e.key === 'Delete') {
+    if (store.selectedCount > 0 && !store.previewImage) {
+      e.preventDefault()
+      store.hideSelectedImages()
     }
   }
 }
@@ -649,6 +659,7 @@ onUnmounted(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .content-inner {

@@ -9,7 +9,7 @@
         <div class="dialog-body">
           <div class="form-row">
             <label>分组名称</label>
-            <input v-model="name" type="text" placeholder="输入分组名称" class="form-input" autofocus />
+            <input v-model="name" type="text" placeholder="输入分组名称" class="form-input" maxlength="5" autofocus />
           </div>
           <div class="form-row">
             <label>快捷键</label>
@@ -83,7 +83,7 @@ function confirm() {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 3000;
+  z-index: 3100;
 }
 
 .dialog {

@@ -28,10 +28,11 @@
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </span>
             <div v-if="store.isMarkedWaste(image.path)" class="waste-overlay"></div>
-            <span v-if="store.getGroupForImage(image.path)" class="group-tag"
-                  :style="{ background: store.getGroupForImage(image.path)!.color }">
-              {{ store.getGroupForImage(image.path)!.name }}
-            </span>
+            <div v-if="store.getGroupsForImage(image.path).length > 0" class="group-tags"
+                 :title="store.getGroupsForImage(image.path).map(g => g.name).join(', ')">
+              <span v-for="g in store.getGroupsForImage(image.path)" :key="g.id" class="group-dot"
+                    :style="{ background: g.color }"></span>
+            </div>
             <button class="select-check" @click.stop="toggleSelection(image)">
               <svg v-if="store.isImageSelected(image.path)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </button>
@@ -414,16 +415,21 @@ watch(filteredImages, () => {
   margin-bottom: 2px;
 }
 
-.group-tag {
+.group-tags {
   position: absolute;
   bottom: 6px;
   left: 6px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 500;
-  color: #fff;
+  display: flex;
+  gap: 3px;
   z-index: 2;
+}
+
+.group-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.3);
   pointer-events: none;
 }
 
@@ -606,81 +612,6 @@ watch(filteredImages, () => {
   background: rgba(212, 83, 83, 0.15);
   pointer-events: none;
   z-index: 1;
-}
-
-.group-tag {
-  position: absolute;
-  bottom: 6px;
-  left: 6px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 500;
-  color: #fff;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.select-check {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1.5px solid rgba(255, 255, 255, 0.4);
-  border-radius: 50%;
-  color: #fff;
-  cursor: pointer;
-  opacity: 0;
-  transition: all var(--transition-fast);
-  backdrop-filter: blur(4px);
-  z-index: 2;
-}
-
-.image-card:hover .select-check,
-.image-card.selected .select-check {
-  opacity: 1;
-}
-
-.image-card.selected .select-check {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.raw-tag {
-  font-size: 9px;
-  padding: 1px 4px;
-  background: rgba(212, 160, 83, 0.2);
-  color: var(--accent);
-  border-radius: 2px;
-  font-weight: 600;
-}
-
-.card-info {
-  padding: 6px 8px;
-}
-
-.card-name {
-  display: block;
-  font-size: 11px;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.card-dir {
-  display: block;
-  font-size: 9px;
-  color: var(--text-tertiary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-top: 2px;
 }
 
 @keyframes spin {
