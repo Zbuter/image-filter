@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-06-13
+
+### Changed
+- 多项UI修复和改进
+- Windows ONNX Runtime DLL 正确打包到 NSIS/MSI 目录
+- macOS ONNX Runtime dylib 打包修复（版本化与非版本化双文件）
+
+
 ## [0.1.16] - 2026-06-09
 
 ### Added
