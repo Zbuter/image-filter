@@ -1,7 +1,0 @@
-{
-  "bundle": {
-    "resources": {
-      "onnxruntime/win-x64/onnxruntime.dll": "onnxruntime.dll"
-    }
-  }
-}

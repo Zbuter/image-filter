@@ -39,6 +39,13 @@ fn main() {
             let dll_src = format!("{}/onnxruntime.dll", lib_dir);
             let dll_dst = bin_dir.join("onnxruntime.dll");
             let _ = fs::copy(&dll_src, &dll_dst);
+
+            let nsis_dir = target_dir.join("release/bundle/nsis");
+            let msi_dir = target_dir.join("release/bundle/msi");
+            for dir in [&nsis_dir, &msi_dir] {
+                let _ = fs::create_dir_all(dir);
+                let _ = fs::copy(&dll_src, dir.join("onnxruntime.dll"));
+            }
         }
         "linux" => {
             let so_src = format!("{}/libonnxruntime.so", lib_dir);
